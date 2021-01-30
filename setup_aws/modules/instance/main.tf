@@ -40,6 +40,11 @@ resource "aws_iam_role_policy" "mids" {
         "s3:DeleteObject"
       ],
       "Resource": ["arn:aws:s3:::${var.bucket_name}/*"]
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["secretsmanager:GetSecretValue"],
+      "Resource": ["arn:aws:secretsmanager:us-west-2:672750028551:secret:github-5LKXx9"]
     }
   ]
 }
