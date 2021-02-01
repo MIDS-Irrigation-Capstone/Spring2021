@@ -1,4 +1,9 @@
+.envrc
+
+__pycache__/
+*.pyc
+.venv
+
 .terraform/
 *.hcl
 *.tfstate*
-.envrc
