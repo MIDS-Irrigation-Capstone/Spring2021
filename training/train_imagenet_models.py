@@ -6,16 +6,18 @@ import json
 
 import argparse
 
-from keras.applications.inception_v3 import InceptionV3
-from keras.applications.resnet import ResNet50, ResNet101, ResNet152
+from tensorflow.keras.applications.inception_v3 import InceptionV3
+from tensorflow.keras.applications.resnet import ResNet50, ResNet101, ResNet152
 
-from keras.models import Model
-from keras.layers import Dense, GlobalAveragePooling2D
-from keras import optimizers
-from keras.initializers import glorot_uniform
+from tensorflow.keras.models import Model
+from tensorflow.keras.layers import Dense, GlobalAveragePooling2D
+from tensorflow.keras import optimizers
+from tensorflow.keras.initializers import glorot_uniform
 
-from keras.utils.np_utils import to_categorical   
-from keras.preprocessing.image import load_img, img_to_array
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
+
+
+IRRIGATED_LABELS = ["irrigated", "rice", "vineyards", "plantations", "olive", "annual"]
 
 
 def get_args_parser():
@@ -30,6 +32,7 @@ def get_args_parser():
     parser.add_argument('--band', default=2, type=int, help="Choose from [2-4,8].")
     parser.add_argument('--batch_size', default=16, type=int, help="Batch size for training.")
     parser.add_argument('--epochs', default=50, type=int)
+    parser.add_argument('--steps', default=256, type=int)
     parser.add_argument('--learning_rate', default=0.0003, type=float)
 
     parser.add_argument('--model', type=str, default="inceptionv3",
@@ -43,16 +46,18 @@ def get_args_parser():
     # Return to caller
     return parser
 
+
 def parse_jsonLabels(file) :
 
     with open(file) as f:
         data = json.load(f)
 
     for label in data['labels'] :
-        if 'irrigated' in label.split(" ") :
-            return 1
+        for irrigated in IRRIGATED_LABELS :
+            if irrigated in label.lower().split(" ") :
+                return True
 
-    return 0
+    return False
 
 def batch_generator(args) :
     # glob all folders in datapath
@@ -68,14 +73,14 @@ def batch_generator(args) :
         images, classes = [],[]
 
         for folder in batch_paths :
-            image = load_img((glob.glob( folder+"*0"+str(args.band)+".tif")[0]))
-            clss = to_categorical( parse_jsonLabels(glob.glob( folder+"*.json")[0]),
-                                    num_classes=2)
+            image = img_to_array(load_img((glob.glob( folder+"*0"+str(args.band)+".tif")[0])))/255.
+            clss = [1,0] if parse_jsonLabels(glob.glob( folder+"*.json")[0]) else [0,1]
 
             images += [image]
-            classes += [clss]
+            classes += [np.asarray(clss)]
 
-        yield (images, classes)
+        batch = (np.stack(images), np.stack(classes))
+        yield batch
 
 
 def create_Classifier(args) :
@@ -121,10 +126,7 @@ def main(args):
     data_generator = batch_generator(args)
     model = create_Classifier(args)
 
-    # for epoch in range(args.epochs) :
-    #     next(data_generator)[1]
-
-    model.fit(data_generator, steps_per_epoch=256, epochs=args.epochs)
+    model.fit(data_generator, steps_per_epoch=args.steps, epochs=args.epochs)
 
     if args.save_path :
         model.save(args.save_path)
@@ -141,3 +143,4 @@ if __name__ == '__main__':
     else :
     	parser.print_help(sys.stderr)
     	sys.exit(1)
+
