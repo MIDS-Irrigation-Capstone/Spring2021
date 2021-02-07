@@ -1,38 +1,33 @@
+from glob import glob
+import argparse
+import csv
+import errno
+import json
+import os
+import time
+
+from matplotlib import pyplot as plt
+from tqdm import tqdm
+import cv2
+import numpy as np
 import pandas as pd
 import tensorflow as tf
-from glob import glob
-import os
-from matplotlib import pyplot as plt
-import numpy as np
-from tqdm import tqdm
 
 # import seaborn as sns
 # from matplotlib.cm import get_cmap
-import csv
-import json
-import time
 from tensorflow.keras.applications import ResNet50, ResNet101V2, Xception, InceptionV3
 from tensorflow.keras.preprocessing import image
 from tensorflow.keras.applications.resnet50 import preprocess_input, decode_predictions
+
 from utils import *
-import argparse
-import cv2
 
 print(f"Using TensorFlow Version: {tf.__version__}")
 # sns.set()
 
 # Set Paths
 BASE_PATH = "./BigEarthData"
-OUTPUT_PATH = os.path.join(BASE_PATH, "models")
+# OUTPUT_PATH = os.path.join(BASE_PATH, "models")
 TFR_PATH = os.path.join(BASE_PATH, "tfrecords")
-
-
-def get_training_dataset(training_filenames, batch_size):
-    return get_batched_dataset(training_filenames, batch_size)
-
-
-def get_validation_dataset(validation_filenames, batch_size):
-    return get_batched_dataset(validation_filenames, batch_size)
 
 
 METRICS = [
@@ -45,6 +40,14 @@ METRICS = [
     tf.keras.metrics.Recall(name="recall"),
     tf.keras.metrics.AUC(name="auc"),
 ]
+
+
+def get_dataset(filename, batch_size):
+    if os.path.isdir(filename):
+        filename = [f for f in glob(os.path.join(filename, "*.tfrecord"))]
+    elif not os.path.isfile(filename):
+        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), filename)
+    return get_batched_dataset(filename, batch_size)
 
 
 def build_model(imported_model, use_pretrain, metrics=METRICS, output_bias=None):
@@ -149,6 +152,7 @@ def _random_apply(func, x, p):
 
 
 def run_model(
+    output_dir,
     name,
     BATCH_SIZE=32,
     epochs=50,
@@ -156,6 +160,8 @@ def run_model(
     architecture=ResNet50,
     pretrain=False,
     augment=False,
+    training_filenames=f"{TFR_PATH}/train.tfrecord",
+    validation_filenames=f"{TFR_PATH}/val.tfrecord",
 ):
     print(50 * "*")
     print(f"Running model: {name}")
@@ -175,10 +181,7 @@ def run_model(
         class_weight = None
         print("Not Using Weights")
 
-    training_filenames = f"{TFR_PATH}/balanced_train_3percent.tfrecord"
-    validation_filenames = f"{TFR_PATH}/balanced_val.tfrecord"
-
-    training_data = get_training_dataset(training_filenames, batch_size=BATCH_SIZE)
+    training_data = get_dataset(training_filenames, batch_size=BATCH_SIZE)
     #     train_df = pd.read_pickle(training_filenames)
     #     train_X = train_df.X.values
     #     train_y = train_df.y.values
@@ -186,7 +189,7 @@ def run_model(
     #     train_X = np.stack(train_X)
     #     train_y = np.stack(train_y)
 
-    val_data = get_validation_dataset(validation_filenames, batch_size=BATCH_SIZE)
+    val_data = get_dataset(validation_filenames, batch_size=BATCH_SIZE)
 
     len_val_records = 4384
     len_train_records = 128
@@ -247,8 +250,8 @@ def run_model(
         df = pd.DataFrame(history.history)
         df["times"] = time_callback.times
 
-    df.to_pickle(f"{OUTPUT_PATH}/{name}.pkl")
-    model.save(f"{OUTPUT_PATH}/{name}.h5")
+    df.to_pickle(f"{output_dir}/{name}.pkl")
+    model.save(f"{output_dir}/{name}.h5")
 
     return df
 
@@ -263,6 +266,7 @@ if __name__ == "__main__":
         "-a",
         "--arch",
         choices=["ResNet50", "ResNet101V2", "Xception", "InceptionV3"],
+        default="ResNet50",
         help="Class of Model Architecture to use for classification",
     )
     parser.add_argument(
@@ -270,6 +274,11 @@ if __name__ == "__main__":
         "--output",
         type=str,
         help="Output File Prefix for model file and dataframe",
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=str,
+        help="Output directory for model file and dataframe",
     )
     parser.add_argument(
         "-b",
@@ -292,6 +301,17 @@ if __name__ == "__main__":
         choices=["True", "False"],
         help="whether to augment the training data",
     )
+    parser.add_argument(
+        "--train-set",
+        type=str,
+        help="Path to tfrecords for training set",
+    )
+    parser.add_argument(
+        "--validation-set",
+        type=str,
+        help="Path to tfrecords for validation set",
+    )
+
     args = parser.parse_args()
 
     arch_dict = {
@@ -305,7 +325,9 @@ if __name__ == "__main__":
     if args.augment == "True":
         AUGMENT = True
 
+    print(args)
     run_model(
+        args.output_dir,
         args.output,
         BATCH_SIZE=args.BATCH_SIZE,
         epochs=args.EPOCHS,
@@ -313,4 +335,6 @@ if __name__ == "__main__":
         architecture=arch_dict[args.arch],
         pretrain=False,
         augment=AUGMENT,
+        training_filenames=args.train_set,
+        validation_filenames=args.validation_set,
     )
