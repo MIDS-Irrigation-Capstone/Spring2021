@@ -31,9 +31,10 @@ fi
 ### Change docker data location and add runtimes
 systemctl stop docker.service
 
+mkdir /data/docker_data
 cat <<EOF >/etc/docker/daemon.json
 {
-  "data-root": "/data",
+  "data-root": "/data/docker_data",
   "runtimes": {
     "nvidia": {
       "path": "nvidia-container-runtime",
@@ -87,5 +88,17 @@ EOF
 
 ### Pull irrigation docker image
 docker pull imander/irgapp
+
+### extract tfrecords
+for percent in 1 3 10 25; do
+  tar xf "/mnt/irrigation_data/BigEarthNet_tfrecords/tfrecords_${percent}_percent.tar" \
+    -C /data \
+    --exclude="tfrecords_${percent}_percent/train.tfrecord" \
+    --exclude="tfrecords_${percent}_percent/test.tfrecord" \
+    --exclude="tfrecords_${percent}_percent/val.tfrecord" \
+    --owner=ubuntu \
+    --group=ubuntu \
+    --no-same-permissions
+done
 
 exit 0
