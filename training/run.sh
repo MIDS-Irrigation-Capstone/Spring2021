@@ -7,6 +7,12 @@ DATA_DIR=/data/tfrecords
 S3_DIR=/mnt/irrigation_data/BigEarthNet_tfrecords
 OUTPUT_DIR=/mnt/irrigation_data/models
 
+# Defaults
+EPOCHS=50
+BATCH_SIZE=32
+AUGMENT=False
+AUGMENT_STR=noaug
+
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
@@ -16,8 +22,17 @@ function log() {
 }
 
 function proceed() {
+  cat <<EOF
+
+  Architecture:    ${ARCH:-"all"}
+  Epochs:          $EPOCHS
+  Batch Size:      $BATCH_SIZE
+  Augment Images:  $AUGMENT
+  Output path:     $OUTPUT_DIR
+EOF
+
   echo
-  read -p "Proceed? [Y/n]: " -n 1 -r
+  read -p "Proceed with training? [Y/n]: " -n 1 -r
   if [[ $REPLY =~ ^[Nn]$ ]]; then
     exit
   fi
@@ -54,7 +69,7 @@ function selectWithDefault() {
 
 function get_architecture() {
   echo "Choose Training Architecture"
-  ARCH=$(selectWithDefault 'ResNet50' 'InceptionV3' 'Xception', 'ResNet101V2')
+  ARCH=$(selectWithDefault 'ResNet50' 'InceptionV3' 'Xception' 'ResNet101V2')
 }
 
 function get_epochs() {
@@ -112,6 +127,7 @@ function get_data_split() {
 }
 
 function prepare() {
+  mkdir -p "$OUTPUT_DIR/${MODEL_DIR}"
   if [[ ! -d "${DATA_DIR}_${SPLIT_PERCENT}" ]]; then
     if [[ ! -f "${DATA_DIR}_${SPLIT_PERCENT}.tar" ]]; then
       log "Downloading training data from S3"
@@ -127,7 +143,7 @@ function prepare() {
   ln -s "${DATA_DIR}_${SPLIT_PERCENT}" ${DATA_DIR}
 }
 
-function baseline_training() {
+function prompt_settings() {
   get_architecture
   get_epochs
   get_batch_size
@@ -136,20 +152,9 @@ function baseline_training() {
   # get_ouput_info
   # get_training_dataset
   # get_validation_dataset
-  cat <<EOF
+}
 
-  Architecture:    $ARCH
-  Epochs:          $EPOCHS
-  Batch Size:      $BATCH_SIZE
-  Augment Images:  $AUGMENT
-  Output path:     $OUTPUT_DIR
-  Outfile Prefix:  $OUTPUT_PREFIX
-EOF
-
-  proceed
-  prepare
-
-  mkdir -p $OUTPUT_DIR
+function baseline_training() {
   DOCKER_NAME="training_$(date '+%Y%m%d%H%M%S')"
   trap "docker rm $DOCKER_NAME" EXIT
   docker run --gpus all --name "$DOCKER_NAME" \
@@ -170,6 +175,71 @@ EOF
   docker logs "$DOCKER_NAME" >"${OUTPUT_DIR}/${OUTPUT_PREFIX}.log"
 }
 
-baseline_training
+function default_training() {
+  TRAIN_DATA="${DATA_DIR}/train"
+  VAL_DATA="${DATA_DIR}/val"
+  for ARCH in InceptionV3 Xception ResNet101V2; do
+    for SPLIT_PERCENT in 1 3 10 25; do
+      OUTPUT_PREFIX="${SPLIT_PERCENT}_${ARCH}_E${EPOCHS}_B${BATCH_SIZE}_${AUGMENT_STR}-$(date '+%Y%m%d')"
+      $TRAIN_FUNCTION
+    done
+  done
+}
+
+TEMP=$(getopt -o 'm:' --long 'no-prompt,model:' -- "$@")
+
+if [ $? -ne 0 ]; then
+  echo 'Terminating...' >&2
+  exit 1
+fi
+
+# Note the quotes around "$TEMP": they are essential!
+eval set -- "$TEMP"
+unset TEMP
+
+while true; do
+  case "$1" in
+  '--no-prompt')
+    PROMPT=false
+    shift
+    continue
+    ;;
+  '-m' | '--model')
+    MODEL="$2"
+    shift 2
+    continue
+    ;;
+  '--')
+    shift
+    break
+    ;;
+  esac
+done
+
+case "${MODEL:-NONE}" in
+'baseline')
+  MODEL_DIR=supervised_baseline
+  TRAIN_FUNCTION=baseline_training
+  ;;
+'NONE')
+  echo "Must specify model with -m or --model option"
+  exit 1
+  ;;
+*)
+  echo -e "Invalid model option!\nChoose one of (baseline)"
+  exit 1
+  ;;
+esac
+
+if [[ -z "${PROMPT:-}" ]]; then
+  prompt_settings
+  proceed
+  prepare
+  $TRAIN_FUNCTION
+else
+  proceed
+  prepare
+  default_training
+fi
 
 exit 0
