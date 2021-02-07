@@ -8,6 +8,11 @@ variable "bucket_name" {
   description = "S3 bucket containing image data"
   default = "mids-capstone-irrigation-detection"
 }
+variable "ami_id" {
+  type = string
+  description = "AMI ID to use for instance. Should be debian based. Default is ubuntu 18.04"
+  default = "ami-025102f49d03bec05"
+}
 variable "availability_zone" {
   type = string
   description = "AWS availability zone to launch instance"

@@ -1,19 +1,3 @@
-data "aws_ami" "ubuntu" {
-  most_recent = true
-
-  filter {
-    name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-bionic-18.04-amd64-server-*"]
-  }
-
-  filter {
-    name   = "virtualization-type"
-    values = ["hvm"]
-  }
-
-  owners = ["099720109477"] # Canonical
-}
-
 resource "aws_iam_instance_profile" "mids" {
   name = "mids_instance"
   role = aws_iam_role.mids.name
@@ -73,7 +57,7 @@ EOF
 }
 
 resource "aws_spot_instance_request" "mids" {
-  ami                    = data.aws_ami.ubuntu.id
+  ami                    = var.ami_id
   spot_price             = var.spot_price
   instance_type          = var.instance_type
   iam_instance_profile   = aws_iam_instance_profile.mids.name

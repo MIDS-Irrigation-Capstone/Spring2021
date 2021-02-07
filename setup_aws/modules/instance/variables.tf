@@ -4,6 +4,9 @@ variable "key_name" {
 variable "bucket_name" {
   type = string
 }
+variable "ami_id" {
+  type = string
+}
 variable "availability_zone" {
   type = string
 }
