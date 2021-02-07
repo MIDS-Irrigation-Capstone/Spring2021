@@ -20,4 +20,5 @@ module "instance" {
   spot_price        = var.spot_price
   instance_type     = var.instance_type
   volume_size       = var.volume_size
+  ami_id            = var.ami_id
 }
