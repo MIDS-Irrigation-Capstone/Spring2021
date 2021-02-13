@@ -7,3 +7,6 @@ __pycache__/
 .terraform/
 *.hcl
 *.tfstate*
+*.h5
+*.pkl
+*.pem
