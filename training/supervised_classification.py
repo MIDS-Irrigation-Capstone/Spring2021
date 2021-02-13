@@ -50,17 +50,17 @@ def get_dataset(filename, batch_size):
     return get_batched_dataset(filename, batch_size)
 
 
-def build_model(imported_model, use_pretrain, metrics=METRICS, output_bias=None):
+def build_model(imported_model, use_pretrain, metrics=METRICS, output_bias=None, dropout=0.25):
     if output_bias is not None:
         output_bias = tf.keras.initializers.Constant(output_bias)
     if use_pretrain:
-        # This option cannot actually be used due to incompatibility with input tensor shapes
+        # SG TODO: making pre-trained weights work
         model = imported_model(
             include_top=False,
             weights="imagenet",
-            input_tensor=None,
-            input_shape=[120, 120, 10],
-            pooling=None,
+            #input_tensor=None,
+            #input_shape=[120, 120, 10],
+            #pooling=None,
         )
         model.trainable = False
     else:
@@ -75,9 +75,9 @@ def build_model(imported_model, use_pretrain, metrics=METRICS, output_bias=None)
     # add new classifier layers
     flat = tf.keras.layers.Flatten()(model.layers[-1].output)
     h1 = tf.keras.layers.Dense(1024, activation="elu")(flat)
-    h1 = tf.keras.layers.Dropout(0.25)(h1)
+    h1 = tf.keras.layers.Dropout(dropout)(h1)
     h2 = tf.keras.layers.Dense(512, activation="elu")(h1)
-    h2 = tf.keras.layers.Dropout(0.25)(h2)
+    h2 = tf.keras.layers.Dropout(dropout)(h2)
     clf = tf.keras.layers.Dense(256, activation="elu")(h2)
     output = tf.keras.layers.Dense(
         1, activation="sigmoid", bias_initializer=output_bias
