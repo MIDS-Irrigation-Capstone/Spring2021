@@ -264,7 +264,11 @@ def run_model(
 
     df.to_pickle(f"{output_dir}/{name}.pkl")
     model.save(f"{output_dir}/{name}.h5")
-    with open(f"{output_dir}/{name}.params.json", "w") as fp:
+
+    print("Evaluating final model against 3% test data")
+    test_dataset = get_dataset("/data/tfrecords_3_percent/test", 32)
+    score = model.evaluate(test_dataset, steps=251, verbose=True)
+    with open(f"{output_dir}/{name}.json", "w") as fp:
         params = {
             "batch_size": BATCH_SIZE,
             "epochs": epochs,
@@ -274,6 +278,7 @@ def run_model(
             "augment": augment,
             "class_weight": class_weight,
             "augmentations": augmentations,
+            "score": score,
         }
         json.dump(params, fp)
 
