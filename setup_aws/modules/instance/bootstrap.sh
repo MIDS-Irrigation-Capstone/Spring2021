@@ -46,6 +46,7 @@ EOF
 
 systemctl start docker.service
 usermod -a -G docker ubuntu
+chmod 777 /data
 
 # install Nvidia drivers if running on GPU
 if lshw | grep -qi nvidia; then
@@ -90,12 +91,12 @@ EOF
 docker pull imander/irgapp
 
 ### extract tfrecords
-for percent in 1 3 10 25; do
-  tar xf "/mnt/irrigation_data/BigEarthNet_tfrecords/tfrecords_${percent}_percent.tar" \
+for percent in 1_percent 3_percent 10_percent 25_percent 50_percent 100_percent test; do
+  tar xf "/mnt/irrigation_data/BigEarthNet_tfrecords_balanced/tfrecords_${percent}.tar" \
     -C /data \
-    --exclude="tfrecords_${percent}_percent/train.tfrecord" \
-    --exclude="tfrecords_${percent}_percent/test.tfrecord" \
-    --exclude="tfrecords_${percent}_percent/val.tfrecord" \
+    --exclude="tfrecords_${percent}/train.tfrecord" \
+    --exclude="tfrecords_${percent}/test.tfrecord" \
+    --exclude="tfrecords_${percent}/val.tfrecord" \
     --owner=ubuntu \
     --group=ubuntu \
     --no-same-permissions
