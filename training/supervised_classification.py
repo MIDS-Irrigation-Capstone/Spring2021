@@ -42,6 +42,12 @@ METRICS = [
 ]
 
 
+def dataset_length(data_dir):
+    input_files = tf.io.gfile.glob(os.path.join(data_dir, "*"))
+    data_set = tf.data.TFRecordDataset(input_files)
+    return sum(1 for record in data_set)
+
+
 def get_dataset(filename, batch_size):
     if os.path.isdir(filename):
         filename = [f for f in glob(os.path.join(filename, "*.tfrecord"))]
@@ -167,12 +173,18 @@ def run_model(
     print(f"Running model: {name}")
     print(50 * "=")
     print(f"Batch Size: {BATCH_SIZE}")
+
+    len_train_records = dataset_length(training_filenames)
+    len_val_records = dataset_length(validation_filenames)
+    print("Training records: {len_train_records}")
+    print("Validation records: {len_val_records}")
+
     if weights:
-        neg = 38400 - 984
-        pos = 984
-        total = neg + pos
-        neg_weight = (1 / neg) * (total) / 2.0
-        pos_weight = (1 / pos) * (total) / 2.0
+        # neg = 38400 - 984
+        # pos = 984
+        # total = neg + pos
+        neg_weight = 1  # (1 / neg) * (total) / 2.0
+        pos_weight = 40  # (1 / pos) * (total) / 2.0
         class_weight = {0: neg_weight, 1: pos_weight}
         print(f"Using Class Weights: ")
         print("\tWeight for Negative Class: {:.2f}".format(neg_weight))
@@ -182,6 +194,7 @@ def run_model(
         print("Not Using Weights")
 
     training_data = get_dataset(training_filenames, batch_size=BATCH_SIZE)
+    val_data = get_dataset(validation_filenames, batch_size=BATCH_SIZE)
     #     train_df = pd.read_pickle(training_filenames)
     #     train_X = train_df.X.values
     #     train_y = train_df.y.values
@@ -189,10 +202,8 @@ def run_model(
     #     train_X = np.stack(train_X)
     #     train_y = np.stack(train_y)
 
-    val_data = get_dataset(validation_filenames, batch_size=BATCH_SIZE)
-
-    len_val_records = 4384
-    len_train_records = 128
+    # len_val_records = 4384
+    # len_train_records = 128
     #     len_train_records = 9942
     steps_per_epoch = len_train_records // BATCH_SIZE
     validation_steps = len_val_records // BATCH_SIZE
@@ -210,8 +221,8 @@ def run_model(
     # print(f'Trainable variables: {model.trainable_weights}')
     model.summary()
 
+    augmentations = None
     if augment:
-
         datagen = image.ImageDataGenerator(
             rotation_range=180,
             width_shift_range=0.10,
@@ -235,6 +246,7 @@ def run_model(
         times = time_callback.times
         df = pd.DataFrame(history.history)
         df["times"] = time_callback.times
+        augmentations = datagen.__dict__
 
     else:
         history = model.fit(
@@ -252,6 +264,23 @@ def run_model(
 
     df.to_pickle(f"{output_dir}/{name}.pkl")
     model.save(f"{output_dir}/{name}.h5")
+
+    print("Evaluating final model against 3% test data")
+    test_dataset = get_dataset("/data/tfrecords_3_percent/test", 32)
+    score = model.evaluate(test_dataset, steps=251, verbose=True)
+    with open(f"{output_dir}/{name}.json", "w") as fp:
+        params = {
+            "batch_size": BATCH_SIZE,
+            "epochs": epochs,
+            "weights": weights,
+            "architecture": architecture.__name__,
+            "pretrain": pretrain,
+            "augment": augment,
+            "class_weight": class_weight,
+            "augmentations": augmentations,
+            "score": score,
+        }
+        json.dump(params, fp)
 
     return df
 
@@ -331,7 +360,7 @@ if __name__ == "__main__":
         args.output,
         BATCH_SIZE=args.BATCH_SIZE,
         epochs=args.EPOCHS,
-        weights=False,
+        weights=args.weights,
         architecture=arch_dict[args.arch],
         pretrain=False,
         augment=AUGMENT,
