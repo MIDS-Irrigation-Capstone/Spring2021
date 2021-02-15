@@ -48,25 +48,25 @@ def dataset_length(data_dir):
     return sum(1 for record in data_set)
 
 
-def get_dataset(filename, batch_size):
+def get_dataset(filename, batch_size, justRGB):
     if os.path.isdir(filename):
         filename = [f for f in glob(os.path.join(filename, "*.tfrecord"))]
     elif not os.path.isfile(filename):
         raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), filename)
-    return get_batched_dataset(filename, batch_size)
+    return get_batched_dataset(filename, batch_size, justRGB)
 
 
 def build_model(imported_model, use_pretrain, metrics=METRICS, output_bias=None, dropout=0.25):
     if output_bias is not None:
         output_bias = tf.keras.initializers.Constant(output_bias)
     if use_pretrain:
-        # SG TODO: making pre-trained weights work
+        # SG: making pre-trained weights work
         model = imported_model(
             include_top=False,
             weights="imagenet",
-            #input_tensor=None,
-            #input_shape=[120, 120, 10],
-            #pooling=None,
+            input_tensor=None,
+            input_shape=[120, 120, 3],
+            pooling=None,
         )
         model.trainable = False
     else:
@@ -193,8 +193,8 @@ def run_model(
         class_weight = None
         print("Not Using Weights")
 
-    training_data = get_dataset(training_filenames, batch_size=BATCH_SIZE)
-    val_data = get_dataset(validation_filenames, batch_size=BATCH_SIZE)
+    training_data = get_dataset(training_filenames, batch_size=BATCH_SIZE, justRGB=pretrain)
+    val_data = get_dataset(validation_filenames, batch_size=BATCH_SIZE, justRGB=pretrain)
     #     train_df = pd.read_pickle(training_filenames)
     #     train_X = train_df.X.values
     #     train_y = train_df.y.values
@@ -320,6 +320,9 @@ if __name__ == "__main__":
         "-e", "--EPOCHS", default=50, type=int, help="number of epochs to run"
     )
     parser.add_argument(
+        "-p", "--pretrained", action="store_true", help="whether to use ImageNet pretrained"
+    )
+    parser.add_argument(
         "-w",
         "--weights",
         default="False",
@@ -367,7 +370,7 @@ if __name__ == "__main__":
         epochs=args.EPOCHS,
         weights=args.weights == "True",
         architecture=arch_dict[args.arch],
-        pretrain=False,
+        pretrain=args.pretrained,
         augment=AUGMENT,
         training_filenames=args.train_set,
         validation_filenames=args.validation_set,
