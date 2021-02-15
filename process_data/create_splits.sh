@@ -58,6 +58,6 @@ for split in 1 3 10 25 50; do
 done
 
 popd
-# rm -rf tmp
+rm -rf tmp
 
 exit 0
