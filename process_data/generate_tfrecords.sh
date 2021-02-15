@@ -8,7 +8,7 @@ NC='\033[0m' # No Color
 
 EARTHNET_ROOT="/data/BigEarthNet-v1.0"
 PROCESSING_DIR="/data/process_data"
-S3_BUCKET="s3://mids-capstone-irrigation-detection/BigEarthNet_tfrecords_new"
+S3_BUCKET="s3://mids-capstone-irrigation-detection/BigEarthNet_tfrecords_balanced"
 
 function log() {
   msg=${1:-}
@@ -69,7 +69,7 @@ function generate_tfrecords() {
 
 mkdir -p "$PROCESSING_DIR"
 rm -rf "temp_splits"
-for fraction in 1 3 10 25 50; do
+for fraction in 1 3 10 25 50 100; do
   mkdir -p "temp_splits"
   cp "balanced_splits/train_$fraction" temp_splits/train
   cp "balanced_splits/val_$fraction" temp_splits/val
@@ -81,12 +81,6 @@ for fraction in 1 3 10 25 50; do
   generate_tfrecords $TRAIN $VAL
   rm -rf "temp_splits"
 done
-
-log "Processing full data set"
-OUT_DIR="tfrecords_100_percent"
-TRAIN="balanced_splits/train"
-VAL="balanced_splits/val"
-generate_tfrecords $TRAIN $VAL
 
 log "Processing test data set"
 OUT_DIR="tfrecords_test"
