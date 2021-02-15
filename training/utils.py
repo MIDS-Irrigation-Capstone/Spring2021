@@ -5,6 +5,8 @@ import time
 from tensorflow.keras.preprocessing import image
 
 
+JUSTRGB=False
+
 def read_tfrecord(example):
     """
     THIS FUNCTION IS USED TO PARSE THE TFRECORDS FILES FOR BIGEARTHNET DATA.
@@ -119,10 +121,17 @@ def read_tfrecord(example):
         axis=2,
     )
 
-    # Finally resize the 20m data and stack the bands together.
-    img = tf.concat(
-        [bands_10m, tf.image.resize(bands_20m, [120, 120], method="bicubic")], axis=2
-    )
+    # SG: for ImageNet pretrained models we can just pass the three RGB channels
+    if JUSTRGB :
+        img = tf.stack([reshaped_example["B04"],
+                        reshaped_example["B03"],
+                        reshaped_example["B02"],
+                        ], axis=2)
+    else :
+        # Finally resize the 20m data and stack the bands together.
+        img = tf.concat(
+            [bands_10m, tf.image.resize(bands_20m, [120, 120], method="bicubic")], axis=2
+        )
 
     multi_hot_label = reshaped_example["original_labels_multi_hot"]
     binary_label = reshaped_example["binary_labels"]
@@ -231,7 +240,7 @@ def read_ca_tfrecord(example):
     return img, 0
 
 
-def get_batched_dataset(filenames, batch_size, augment=False, simclr=False, ca=False):
+def get_batched_dataset(filenames, batch_size, justRGB, augment=False, simclr=False, ca=False):
     """
     This function is used to return a batch generator for training our tensorflow model.
     basically we read from different tfrecords files, and shuffle our records.
@@ -239,6 +248,9 @@ def get_batched_dataset(filenames, batch_size, augment=False, simclr=False, ca=F
     Finally - if it is a SimCLR model do not repeat the dataset, as we manually loop over our data
     and train our model in the simclr.py script.
     """
+    global JUSTRGB
+    JUSTRGB=justRGB
+
     option_no_order = tf.data.Options()
     option_no_order.experimental_deterministic = False
 
