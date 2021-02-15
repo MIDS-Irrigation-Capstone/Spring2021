@@ -4,6 +4,7 @@ set -euo pipefail
 IFS=$'\n\t'
 
 DATA_DIR=/data/tfrecords
+TEST_DIR=/data/tfrecords_test/test
 S3_DIR=/mnt/irrigation_data/BigEarthNet_tfrecords
 # OUTPUT_DIR=/data/irrigation_data/models
 OUTPUT_DIR=/mnt/irrigation_data/models
@@ -13,7 +14,7 @@ EPOCHS=50
 BATCH_SIZE=32
 AUGMENT=False
 AUGMENT_STR=noaug
-WEIGHTS=True
+WEIGHTS=False
 
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
@@ -123,16 +124,16 @@ function get_validation_dataset() {
 
 function get_data_split() {
   echo "BigEarthNet data split percentage"
-  SPLIT_PERCENT=$(selectWithDefault '1 percent' '3 percent' '10 percent' '25 percent' | tr ' ' '_')
+  SPLIT_PERCENT=$(selectWithDefault '1 percent' '3 percent' '10 percent' '25 percent' '50 percent' '100 percent' | tr ' ' '_')
   OUTPUT_PREFIX="${SPLIT_PERCENT}_${ARCH}_E${EPOCHS}_B${BATCH_SIZE}_${AUGMENT_STR}-$(date '+%Y%m%d')"
   TRAIN_DATA="${DATA_DIR}/train"
   VAL_DATA="${DATA_DIR}/val"
 }
 
 function get_weights() {
-  read -e -p "Apply weights [yes]: " -r
-  if [[ $REPLY =~ ^[Nn].*$ ]]; then
-    WEIGHTS='False'
+  read -e -p "Apply weights [no]: " -r
+  if [[ $REPLY =~ ^[Yy].*$ ]]; then
+    WEIGHTS='True'
   fi
 }
 
@@ -173,6 +174,7 @@ function baseline_training() {
     -v "$(pwd):/capstone_fall20_irrigation" \
     -v "$OUTPUT_DIR:$OUTPUT_DIR" \
     -v "$DATA_DIR:$DATA_DIR" \
+    -v "$TEST_DIR:/data/test" \
     -w /capstone_fall20_irrigation \
     imander/irgapp \
     python3 supervised_classification.py \
@@ -191,8 +193,8 @@ function baseline_training() {
 function default_training() {
   TRAIN_DATA="${DATA_DIR}/train"
   VAL_DATA="${DATA_DIR}/val"
-  for ARCH in InceptionV3 Xception ResNet101V2; do
-    for split in 1 3 10 25; do
+  for ARCH in ResNet50 InceptionV3 Xception ResNet101V2; do
+    for split in 1 3 10 25 50 100; do
       SPLIT_PERCENT="${split}_percent"
       prepare
       OUTPUT_PREFIX="${SPLIT_PERCENT}_${ARCH}_E${EPOCHS}_B${BATCH_SIZE}_${AUGMENT_STR}-$(date '+%Y%m%d')"

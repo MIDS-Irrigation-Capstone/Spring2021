@@ -243,7 +243,7 @@ def get_batched_dataset(filenames, batch_size, augment=False, simclr=False, ca=F
     option_no_order.experimental_deterministic = False
 
     dataset = tf.data.Dataset.list_files(filenames, shuffle=True)
-    print(f"Filenames: {filenames}")
+    # print(f"Filenames: {filenames}")
     dataset = dataset.with_options(option_no_order)
     dataset = dataset.interleave(
         tf.data.TFRecordDataset, cycle_length=2, num_parallel_calls=1

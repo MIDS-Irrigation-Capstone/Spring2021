@@ -176,8 +176,8 @@ def run_model(
 
     len_train_records = dataset_length(training_filenames)
     len_val_records = dataset_length(validation_filenames)
-    print("Training records: {len_train_records}")
-    print("Validation records: {len_val_records}")
+    print(f"Training records: {len_train_records}")
+    print(f"Validation records: {len_val_records}")
 
     if weights:
         # neg = 38400 - 984
@@ -265,9 +265,9 @@ def run_model(
     df.to_pickle(f"{output_dir}/{name}.pkl")
     model.save(f"{output_dir}/{name}.h5")
 
-    print("Evaluating final model against 3% test data")
-    test_dataset = get_dataset("/data/tfrecords_3_percent/test", 32)
-    score = model.evaluate(test_dataset, steps=251, verbose=True)
+    print("Evaluating final model against test data")
+    test_dataset = get_dataset("/data/test", 32)
+    score = model.evaluate(test_dataset, steps=125, verbose=True)
     with open(f"{output_dir}/{name}.json", "w") as fp:
         params = {
             "batch_size": BATCH_SIZE,
@@ -320,7 +320,12 @@ if __name__ == "__main__":
         "-e", "--EPOCHS", default=50, type=int, help="number of epochs to run"
     )
     parser.add_argument(
-        "-w", "--weights", default=False, type=bool, help="whether to use weights"
+        "-w",
+        "--weights",
+        default="False",
+        type=str,
+        help="whether to use weights",
+        choices=["True", "False"],
     )
     parser.add_argument(
         "-g",
@@ -360,7 +365,7 @@ if __name__ == "__main__":
         args.output,
         BATCH_SIZE=args.BATCH_SIZE,
         epochs=args.EPOCHS,
-        weights=args.weights,
+        weights=args.weights == "True",
         architecture=arch_dict[args.arch],
         pretrain=False,
         augment=AUGMENT,
