@@ -6,10 +6,6 @@ import json
 import os
 import time
 
-# Force CPU
-os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"   # see issue #152
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 import cv2
@@ -172,6 +168,7 @@ def run_model(
     augment=False,
     training_filenames=f"{TFR_PATH}/train.tfrecord",
     validation_filenames=f"{TFR_PATH}/val.tfrecord",
+    test_dir = f"{TFR_PATH}/test.tfrecord",
 ):
     print(50 * "*")
     print(f"Running model: {name}")
@@ -270,7 +267,7 @@ def run_model(
     model.save(f"{output_dir}/{name}.h5")
 
     print("Evaluating final model against test data")
-    test_dataset = get_dataset("/data/test", 32, justRGB=pretrain)
+    test_dataset = get_dataset(test_dir, 32, justRGB=pretrain)
     score = model.evaluate(test_dataset, steps=125, verbose=True)
     with open(f"{output_dir}/{name}.json", "w") as fp:
         params = {
@@ -353,6 +350,13 @@ if __name__ == "__main__":
         help="Path to tfrecords for validation set",
     )
 
+    parser.add_argument(
+        "--test-set",
+        default="/data/test",
+        type=str,
+        help="Path to tfrecords for validation set",
+    )
+
     args = parser.parse_args()
 
     arch_dict = {
@@ -378,4 +382,5 @@ if __name__ == "__main__":
         augment=AUGMENT,
         training_filenames=args.train_set,
         validation_filenames=args.validation_set,
+        test_dir=args.test_set
     )
