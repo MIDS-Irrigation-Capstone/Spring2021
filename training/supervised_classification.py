@@ -6,6 +6,10 @@ import json
 import os
 import time
 
+# Force CPU
+os.environ["CUDA_DEVICE_ORDER"] = "PCI_BUS_ID"   # see issue #152
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+
 from matplotlib import pyplot as plt
 from tqdm import tqdm
 import cv2
@@ -266,7 +270,7 @@ def run_model(
     model.save(f"{output_dir}/{name}.h5")
 
     print("Evaluating final model against test data")
-    test_dataset = get_dataset("/data/test", 32)
+    test_dataset = get_dataset("/data/test", 32, justRGB=pretrain)
     score = model.evaluate(test_dataset, steps=125, verbose=True)
     with open(f"{output_dir}/{name}.json", "w") as fp:
         params = {
