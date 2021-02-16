@@ -1,7 +1,7 @@
 #!/bin/bash
 
 set -euo pipefail
-IFS=$'\n\t'
+IFS=$'\n\t '
 
 DATA_DIR=/data/tfrecords
 TEST_DIR=/data/tfrecords_test/test
@@ -16,6 +16,7 @@ AUGMENT=False
 AUGMENT_STR=noaug
 WEIGHTS=False
 
+DATE=$(date '+%Y%m%d')
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
@@ -25,14 +26,21 @@ function log() {
 }
 
 function proceed() {
+  pretrain=False
+  if [[ -n "${PRETRAIN:-}" ]]; then
+    pretrain=True
+  fi
   cat <<EOF
 
-  Architecture:    ${ARCH:-"all"}
+  Architecture:    ${ARCH:-all}
+  Split Percent:   ${SPLIT_PERCENT:-all}
   Epochs:          $EPOCHS
   Batch Size:      $BATCH_SIZE
   Augment Images:  $AUGMENT
   Apply Weights:   $WEIGHTS
+  Use Pretrain:    $pretrain
   Output path:     $OUTPUT_DIR
+  Added Labels:    ${LABELS:-None}
 EOF
 
   echo
@@ -73,7 +81,7 @@ function selectWithDefault() {
 
 function get_architecture() {
   echo "Choose Training Architecture"
-  ARCH=$(selectWithDefault 'ResNet50' 'InceptionV3' 'Xception' 'ResNet101V2')
+  ARCH=$(selectWithDefault 'all' 'ResNet50' 'InceptionV3' 'Xception' 'ResNet101V2')
 }
 
 function get_epochs() {
@@ -97,17 +105,9 @@ function get_augment() {
 }
 
 function get_ouput_info() {
-  local default=/mnt/irrigation_data/models
-  read -e -p "Model output directory [$default]: " OUTPUT_DIR
-  OUTPUT_DIR=${OUTPUT_DIR:-$default}
-
-  default="${ARCH}_E${EPOCHS}_B${BATCH_SIZE}_${AUGMENT_STR}-$(date '+%Y%m%d')"
-  read -e -p "Output file prefix: " OUTPUT_PREFIX
-  if [[ -z "$OUTPUT_PREFIX" ]]; then
-    OUTPUT_PREFIX=$default
-  else
-    OUTPUT_PREFIX="${OUTPUT_PREFIX}-${default}"
-  fi
+  read -e -p "Model output directory [$OUTPUT_DIR]: " out
+  OUTPUT_DIR=${out:-$OUTPUT_DIR}
+  read -e -p "Additional Labels: " LABELS
 }
 
 function get_training_dataset() {
@@ -124,10 +124,7 @@ function get_validation_dataset() {
 
 function get_data_split() {
   echo "BigEarthNet data split percentage"
-  SPLIT_PERCENT=$(selectWithDefault '1 percent' '3 percent' '10 percent' '25 percent' '50 percent' '100 percent' | tr ' ' '_')
-  OUTPUT_PREFIX="${SPLIT_PERCENT}_${ARCH}_E${EPOCHS}_B${BATCH_SIZE}_${AUGMENT_STR}-$(date '+%Y%m%d')"
-  TRAIN_DATA="${DATA_DIR}/train"
-  VAL_DATA="${DATA_DIR}/val"
+  SPLIT_PERCENT=$(selectWithDefault 'all' '1 percent' '3 percent' '10 percent' '25 percent' '50 percent' '100 percent' | awk '{print $1}')
 }
 
 function get_weights() {
@@ -153,6 +150,14 @@ function prepare() {
   log "Creating symbolic link"
   rm -f ${DATA_DIR}
   ln -s "${DATA_DIR}_${SPLIT_PERCENT}" ${DATA_DIR}
+
+  OUTPUT_PREFIX="${SPLIT_PERCENT}_${ARCH}_E${EPOCHS}_B${BATCH_SIZE}_${AUGMENT_STR}"
+  if [[ -n "${LABELS:-}" ]]; then
+    OUTPUT_PREFIX="${OUTPUT_PREFIX}_${LABELS}"
+  fi
+  OUTPUT_PREFIX="${OUTPUT_PREFIX}-${DATE}"
+  TRAIN_DATA="${DATA_DIR}/train"
+  VAL_DATA="${DATA_DIR}/val"
 }
 
 function prompt_settings() {
@@ -162,15 +167,21 @@ function prompt_settings() {
   get_augment
   get_data_split
   get_weights
-  # get_ouput_info
+  get_ouput_info
   # get_training_dataset
   # get_validation_dataset
 }
 
+function remove_container() {
+  log "Removing docker container: $DOCKER_NAME"
+  docker rm -f $DOCKER_NAME || true
+}
+
 function baseline_training() {
   DOCKER_NAME="training_$(date '+%Y%m%d%H%M%S')"
-  trap "docker rm $DOCKER_NAME" EXIT
+  trap remove_container EXIT
   docker run --gpus all --name "$DOCKER_NAME" \
+    --user $(id -u):$(id -g) \
     -v "$(pwd):/capstone_fall20_irrigation" \
     -v "$OUTPUT_DIR:$OUTPUT_DIR" \
     -v "$DATA_DIR:$DATA_DIR" \
@@ -186,18 +197,27 @@ function baseline_training() {
     -g "$AUGMENT" \
     --weights "$WEIGHTS" \
     --train-set "$TRAIN_DATA" \
-    --validation-set "$VAL_DATA"
+    --validation-set "$VAL_DATA" \
+    "${EXTRA_ARGS:-}"
   docker logs "$DOCKER_NAME" >"${OUTPUT_DIR}/${MODEL_DIR}/${OUTPUT_PREFIX}.log"
+  remove_container
 }
 
 function default_training() {
   TRAIN_DATA="${DATA_DIR}/train"
   VAL_DATA="${DATA_DIR}/val"
-  for ARCH in ResNet50 InceptionV3 Xception ResNet101V2; do
-    for split in 1 3 10 25 50 100; do
-      SPLIT_PERCENT="${split}_percent"
+  arch=${ARCH:-}
+  if [[ -z "$arch" ]] || [[ "$arch" == "all" ]]; then
+    arch="ResNet50 InceptionV3 Xception ResNet101V2"
+  fi
+  split=${SPLIT_PERCENT:-}
+  if [[ -z "$split" ]] || [[ "$split" == "all" ]]; then
+    split="1 3 10 25 50 100"
+  fi
+  for ARCH in $(echo $arch); do
+    for SPLIT in $(echo $split); do
+      SPLIT_PERCENT="${SPLIT}_percent"
       prepare
-      OUTPUT_PREFIX="${SPLIT_PERCENT}_${ARCH}_E${EPOCHS}_B${BATCH_SIZE}_${AUGMENT_STR}-$(date '+%Y%m%d')"
       $TRAIN_FUNCTION
     done
   done
@@ -238,24 +258,31 @@ case "${MODEL:-NONE}" in
   MODEL_DIR=supervised_baseline
   TRAIN_FUNCTION=baseline_training
   ;;
+'baseline-pretrained')
+  MODEL_DIR=supervised_baseline_pretrained
+  TRAIN_FUNCTION=baseline_training
+  PRETRAIN=True
+  EXTRA_ARGS="--pretrained"
+  ;;
 'NONE')
   echo "Must specify model with -m or --model option"
   exit 1
   ;;
 *)
-  echo -e "Invalid model option!\nChoose one of (baseline)"
+  cat <<EOF
+Invalid model option!
+Choose one of:
+   - baseline
+   - baseline-pretrained
+EOF
   exit 1
   ;;
 esac
 
 if [[ -z "${PROMPT:-}" ]]; then
   prompt_settings
-  proceed
-  prepare
-  $TRAIN_FUNCTION
-else
-  proceed
-  default_training
 fi
+proceed
+default_training
 
-exit 0
+exit 1
