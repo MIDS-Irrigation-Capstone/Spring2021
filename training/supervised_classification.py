@@ -48,15 +48,17 @@ def dataset_length(data_dir):
     return sum(1 for record in data_set)
 
 
-def get_dataset(filename, batch_size, justRGB):
+def get_dataset(filename, batch_size, justRGB, expanded):
     if os.path.isdir(filename):
         filename = [f for f in glob(os.path.join(filename, "*.tfrecord"))]
     elif not os.path.isfile(filename):
         raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), filename)
-    return get_batched_dataset(filename, batch_size, justRGB)
+    return get_batched_dataset(filename, batch_size, justRGB, expanded)
 
 
-def build_model(imported_model, use_pretrain, metrics=METRICS, output_bias=None, dropout=0.25):
+def build_model(
+    imported_model, use_pretrain, metrics=METRICS, output_bias=None, dropout=0.25
+):
     if output_bias is not None:
         output_bias = tf.keras.initializers.Constant(output_bias)
     if use_pretrain:
@@ -168,7 +170,8 @@ def run_model(
     augment=False,
     training_filenames=f"{TFR_PATH}/train.tfrecord",
     validation_filenames=f"{TFR_PATH}/val.tfrecord",
-    test_dir = f"{TFR_PATH}/test.tfrecord",
+    test_filenames=f"{TFR_PATH}/test.tfrecord",
+    expanded_labels=True,
 ):
     print(50 * "*")
     print(f"Running model: {name}")
@@ -177,8 +180,10 @@ def run_model(
 
     len_train_records = dataset_length(training_filenames)
     len_val_records = dataset_length(validation_filenames)
+    len_test_records = dataset_length(test_filenames)
     print(f"Training records: {len_train_records}")
     print(f"Validation records: {len_val_records}")
+    print(f"Test records: {len_test_records}")
 
     if weights:
         # neg = 38400 - 984
@@ -194,20 +199,28 @@ def run_model(
         class_weight = None
         print("Not Using Weights")
 
-    training_data = get_dataset(training_filenames, batch_size=BATCH_SIZE, justRGB=pretrain)
-    val_data = get_dataset(validation_filenames, batch_size=BATCH_SIZE, justRGB=pretrain)
-    #     train_df = pd.read_pickle(training_filenames)
-    #     train_X = train_df.X.values
-    #     train_y = train_df.y.values
+    training_data = get_dataset(
+        training_filenames,
+        batch_size=BATCH_SIZE,
+        justRGB=pretrain,
+        expanded=expanded_labels,
+    )
+    val_data = get_dataset(
+        validation_filenames,
+        batch_size=BATCH_SIZE,
+        justRGB=pretrain,
+        expanded=expanded_labels,
+    )
+    test_data = get_dataset(
+        test_filenames,
+        batch_size=BATCH_SIZE,
+        justRGB=pretrain,
+        expanded=expanded_labels,
+    )
 
-    #     train_X = np.stack(train_X)
-    #     train_y = np.stack(train_y)
-
-    # len_val_records = 4384
-    # len_train_records = 128
-    #     len_train_records = 9942
     steps_per_epoch = len_train_records // BATCH_SIZE
     validation_steps = len_val_records // BATCH_SIZE
+    test_steps = len_test_records // BATCH_SIZE
 
     # Use an early stopping callback and our timing callback
     early_stop = tf.keras.callbacks.EarlyStopping(
@@ -267,8 +280,7 @@ def run_model(
     model.save(f"{output_dir}/{name}.h5")
 
     print("Evaluating final model against test data")
-    test_dataset = get_dataset(test_dir, 32, justRGB=pretrain)
-    score = model.evaluate(test_dataset, steps=125, verbose=True)
+    score = model.evaluate(test_data, steps=test_steps, verbose=True)
     with open(f"{output_dir}/{name}.json", "w") as fp:
         params = {
             "batch_size": BATCH_SIZE,
@@ -321,7 +333,10 @@ if __name__ == "__main__":
         "-e", "--EPOCHS", default=50, type=int, help="number of epochs to run"
     )
     parser.add_argument(
-        "-p", "--pretrained", action="store_true", help="whether to use ImageNet pretrained"
+        "-p",
+        "--pretrained",
+        action="store_true",
+        help="whether to use ImageNet pretrained",
     )
     parser.add_argument(
         "-w",
@@ -349,15 +364,20 @@ if __name__ == "__main__":
         type=str,
         help="Path to tfrecords for validation set",
     )
-
     parser.add_argument(
         "--test-set",
         default="/data/test",
         type=str,
         help="Path to tfrecords for validation set",
     )
+    parser.add_argument(
+        "--expanded-labels",
+        action="store_true",
+        help="Whether to use expanded irrigation labels",
+    )
 
-    args = parser.parse_args()
+    # second variable to ignore unknown args
+    args, _ = parser.parse_known_args()
 
     arch_dict = {
         "ResNet50": ResNet50,
@@ -382,5 +402,6 @@ if __name__ == "__main__":
         augment=AUGMENT,
         training_filenames=args.train_set,
         validation_filenames=args.validation_set,
-        test_dir=args.test_set
+        test_filenames=args.test_set,
+        expanded_labels=args.expanded_labels,
     )

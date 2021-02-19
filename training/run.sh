@@ -3,8 +3,12 @@
 set -euo pipefail
 IFS=$'\n\t '
 
-DATA_DIR=/data/tfrecords
-TEST_DIR=/data/tfrecords_test/test
+DATA_DIR=/data/expanded
+DATA_SET='Expanded Labels'
+EXPANDED_LABELS="--expanded-labels"
+
+TEST_DIR="${DATA_DIR}/tfrecords_test/test"
+# TEST_DIR=/data/tfrecords_test/test
 S3_DIR=/mnt/irrigation_data/BigEarthNet_tfrecords
 # OUTPUT_DIR=/data/irrigation_data/models
 OUTPUT_DIR=/mnt/irrigation_data/models
@@ -33,6 +37,7 @@ function proceed() {
   cat <<EOF
 
   Architecture:    ${ARCH:-all}
+  Data Set:        $DATA_SET
   Split Percent:   ${SPLIT_PERCENT:-all}
   Epochs:          $EPOCHS
   Batch Size:      $BATCH_SIZE
@@ -110,17 +115,17 @@ function get_ouput_info() {
   read -e -p "Additional Labels: " LABELS
 }
 
-function get_training_dataset() {
-  local default=/data/tfrecords/train.tfrecord
-  read -e -p "Training dataset [$default]: " TRAIN_DATA
-  TRAIN_DATA=${TRAIN_DATA:-$default}
-}
+# function get_training_dataset() {
+#   local default=/data/tfrecords/train.tfrecord
+#   read -e -p "Training dataset [$default]: " TRAIN_DATA
+#   TRAIN_DATA=${TRAIN_DATA:-$default}
+# }
 
-function get_validation_dataset() {
-  local default=/data/tfrecords/val.tfrecord
-  read -e -p "Validation dataset [$default]: " VAL_DATA
-  VAL_DATA=${TRAIN_DATA:-$default}
-}
+# function get_validation_dataset() {
+#   local default=/data/tfrecords/val.tfrecord
+#   read -e -p "Validation dataset [$default]: " VAL_DATA
+#   VAL_DATA=${TRAIN_DATA:-$default}
+# }
 
 function get_data_split() {
   echo "BigEarthNet data split percentage"
@@ -134,30 +139,41 @@ function get_weights() {
   fi
 }
 
+function get_dataset() {
+  read -e -p "Expanded data set [yes]: " -r
+  if [[ $REPLY =~ ^[Nn].*$ ]]; then
+    DATA_DIR='/data'
+    TEST_DIR="${DATA_DIR}/tfrecords_test/test"
+    DATA_SET='Exact Labels'
+    EXPANDED_LABELS=""
+  fi
+}
+
 function prepare() {
   mkdir -p "$OUTPUT_DIR/${MODEL_DIR}"
-  if [[ ! -d "${DATA_DIR}_${SPLIT_PERCENT}" ]]; then
-    log "${DATA_DIR}_${SPLIT_PERCENT} not found"
-    if [[ ! -f "${DATA_DIR}_${SPLIT_PERCENT}.tar" ]]; then
+  TF_RECORDS="${DATA_DIR}/tfrecords"
+  if [[ ! -d "${TF_RECORDS}_${SPLIT_PERCENT}" ]]; then
+    log "${TF_RECORDS}_${SPLIT_PERCENT} not found"
+    if [[ ! -f "${TF_RECORDS}_${SPLIT_PERCENT}.tar" ]]; then
       log "Downloading training data from S3"
-      sudo cp "${S3_DIR}/tfrecords_${SPLIT_PERCENT}.tar" /data/
-      sudo chown ubuntu: "${DATA_DIR}_${SPLIT_PERCENT}.tar"
-      chmod 644 "${DATA_DIR}_${SPLIT_PERCENT}.tar"
+      sudo cp "${S3_DIR}_${SPLIT_PERCENT}.tar" /data/
+      sudo chown ubuntu: "${TF_RECORDS}_${SPLIT_PERCENT}.tar"
+      chmod 644 "${TF_RECORDS}_${SPLIT_PERCENT}.tar"
     fi
     log "Extracting training data"
-    tar xf "${DATA_DIR}_${SPLIT_PERCENT}.tar" -C "$(dirname "$DATA_DIR")"
+    tar xf "${TF_RECORDS}_${SPLIT_PERCENT}.tar" -C "$(dirname "$TF_RECORDS")"
   fi
   log "Creating symbolic link"
-  rm -f ${DATA_DIR}
-  ln -s "${DATA_DIR}_${SPLIT_PERCENT}" ${DATA_DIR}
+  rm -f "${TF_RECORDS}"
+  ln -s "${TF_RECORDS}_${SPLIT_PERCENT}" "${TF_RECORDS}"
 
   OUTPUT_PREFIX="${SPLIT_PERCENT}_${ARCH}_E${EPOCHS}_B${BATCH_SIZE}_${AUGMENT_STR}"
   if [[ -n "${LABELS:-}" ]]; then
     OUTPUT_PREFIX="${OUTPUT_PREFIX}_${LABELS}"
   fi
   OUTPUT_PREFIX="${OUTPUT_PREFIX}-${DATE}"
-  TRAIN_DATA="${DATA_DIR}/train"
-  VAL_DATA="${DATA_DIR}/val"
+  TRAIN_DATA="${TF_RECORDS}/train"
+  VAL_DATA="${TF_RECORDS}/val"
 }
 
 function prompt_settings() {
@@ -168,6 +184,7 @@ function prompt_settings() {
   get_data_split
   get_weights
   get_ouput_info
+  get_dataset
   # get_training_dataset
   # get_validation_dataset
 }
@@ -198,7 +215,8 @@ function baseline_training() {
     --weights "$WEIGHTS" \
     --train-set "$TRAIN_DATA" \
     --validation-set "$VAL_DATA" \
-    "${EXTRA_ARGS:-}"
+    ${EXPANDED_LABELS} \
+    ${EXTRA_ARGS:-}
   docker logs "$DOCKER_NAME" >"${OUTPUT_DIR}/${MODEL_DIR}/${OUTPUT_PREFIX}.log"
   remove_container
 }
@@ -208,7 +226,8 @@ function default_training() {
   VAL_DATA="${DATA_DIR}/val"
   arch=${ARCH:-}
   if [[ -z "$arch" ]] || [[ "$arch" == "all" ]]; then
-    arch="ResNet50 InceptionV3 Xception ResNet101V2"
+    # arch="ResNet50 InceptionV3 Xception ResNet101V2"
+    arch="Xception ResNet101V2"
   fi
   split=${SPLIT_PERCENT:-}
   if [[ -z "$split" ]] || [[ "$split" == "all" ]]; then
