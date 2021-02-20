@@ -3,12 +3,10 @@
 set -euo pipefail
 IFS=$'\n\t '
 
-DATA_DIR=/data/expanded
-DATA_SET='Expanded Labels'
+DATA_DIR=/data
+DATA_TYPE='expanded'
 EXPANDED_LABELS="--expanded-labels"
 
-TEST_DIR="${DATA_DIR}/tfrecords_test/test"
-# TEST_DIR=/data/tfrecords_test/test
 S3_DIR=/mnt/irrigation_data/BigEarthNet_tfrecords
 # OUTPUT_DIR=/data/irrigation_data/models
 OUTPUT_DIR=/mnt/irrigation_data/models
@@ -30,14 +28,19 @@ function log() {
 }
 
 function proceed() {
-  pretrain=False
+  local pretrain=False
+  local data_set="Expanded Labels"
+
   if [[ -n "${PRETRAIN:-}" ]]; then
     pretrain=True
+  fi
+  if [[ "${DATA_TYPE}" == "balanced" ]]; then
+    data_set="Exact Labels"
   fi
   cat <<EOF
 
   Architecture:    ${ARCH:-all}
-  Data Set:        $DATA_SET
+  Data Set:        $data_set
   Split Percent:   ${SPLIT_PERCENT:-all}
   Epochs:          $EPOCHS
   Batch Size:      $BATCH_SIZE
@@ -115,18 +118,6 @@ function get_ouput_info() {
   read -e -p "Additional Labels: " LABELS
 }
 
-# function get_training_dataset() {
-#   local default=/data/tfrecords/train.tfrecord
-#   read -e -p "Training dataset [$default]: " TRAIN_DATA
-#   TRAIN_DATA=${TRAIN_DATA:-$default}
-# }
-
-# function get_validation_dataset() {
-#   local default=/data/tfrecords/val.tfrecord
-#   read -e -p "Validation dataset [$default]: " VAL_DATA
-#   VAL_DATA=${TRAIN_DATA:-$default}
-# }
-
 function get_data_split() {
   echo "BigEarthNet data split percentage"
   SPLIT_PERCENT=$(selectWithDefault 'all' '1 percent' '3 percent' '10 percent' '25 percent' '50 percent' '100 percent' | awk '{print $1}')
@@ -142,8 +133,7 @@ function get_weights() {
 function get_dataset() {
   read -e -p "Expanded data set [yes]: " -r
   if [[ $REPLY =~ ^[Nn].*$ ]]; then
-    DATA_DIR='/data'
-    TEST_DIR="${DATA_DIR}/tfrecords_test/test"
+    DATA_TYPE='balanced'
     DATA_SET='Exact Labels'
     EXPANDED_LABELS=""
   fi
@@ -151,7 +141,7 @@ function get_dataset() {
 
 function prepare() {
   mkdir -p "$OUTPUT_DIR/${MODEL_DIR}"
-  TF_RECORDS="${DATA_DIR}/tfrecords"
+  TF_RECORDS="${DATA_DIR}/${DATA_TYPE}/tfrecords"
   if [[ ! -d "${TF_RECORDS}_${SPLIT_PERCENT}" ]]; then
     log "${TF_RECORDS}_${SPLIT_PERCENT} not found"
     if [[ ! -f "${TF_RECORDS}_${SPLIT_PERCENT}.tar" ]]; then
@@ -185,8 +175,6 @@ function prompt_settings() {
   get_weights
   get_ouput_info
   get_dataset
-  # get_training_dataset
-  # get_validation_dataset
 }
 
 function remove_container() {
@@ -195,6 +183,7 @@ function remove_container() {
 }
 
 function baseline_training() {
+  TEST_DIR="${DATA_DIR}/${DATA_TYPE}/tfrecords_test/test"
   DOCKER_NAME="training_$(date '+%Y%m%d%H%M%S')"
   trap remove_container EXIT
   docker run --gpus all --name "$DOCKER_NAME" \
@@ -224,10 +213,9 @@ function baseline_training() {
 function default_training() {
   TRAIN_DATA="${DATA_DIR}/train"
   VAL_DATA="${DATA_DIR}/val"
-  arch=${ARCH:-}
+  local arch=${ARCH:-}
   if [[ -z "$arch" ]] || [[ "$arch" == "all" ]]; then
-    # arch="ResNet50 InceptionV3 Xception ResNet101V2"
-    arch="Xception ResNet101V2"
+    arch="ResNet50 InceptionV3 Xception ResNet101V2"
   fi
   split=${SPLIT_PERCENT:-}
   if [[ -z "$split" ]] || [[ "$split" == "all" ]]; then
