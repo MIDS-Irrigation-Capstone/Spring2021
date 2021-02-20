@@ -92,7 +92,7 @@ docker pull imander/irgapp
 
 ### extract tfrecords
 for data_dir in $(ls -1 /mnt/irrigation_data/ | grep balanced); do
-  local extract_dir="/data/${data_dir##*_}"
+  extract_dir="/data/${data_dir##*_}"
   mkdir -pm 777 "$extract_dir"
   for percent in 1_percent 3_percent 10_percent 25_percent 50_percent 100_percent test; do
     tar xf "$data_dir/tfrecords_${percent}.tar" \

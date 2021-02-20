@@ -7,7 +7,7 @@ DATA_DIR=/data
 DATA_TYPE='expanded'
 EXPANDED_LABELS="--expanded-labels"
 
-S3_DIR=/mnt/irrigation_data/BigEarthNet_tfrecords
+S3_DIR=/mnt/irrigation_data
 # OUTPUT_DIR=/data/irrigation_data/models
 OUTPUT_DIR=/mnt/irrigation_data/models
 
@@ -20,11 +20,17 @@ WEIGHTS=False
 
 DATE=$(date '+%Y%m%d')
 GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
 function log() {
   msg=${1:-}
   printf "$(date -u) ${GREEN}INFO${NC} $msg\n"
+}
+
+function warn() {
+  msg=${1:-}
+  printf "$(date -u) ${YELLOW}WARNING${NC} $msg\n"
 }
 
 function proceed() {
@@ -139,24 +145,37 @@ function get_dataset() {
   fi
 }
 
-function prepare() {
-  mkdir -p "$OUTPUT_DIR/${MODEL_DIR}"
-  TF_RECORDS="${DATA_DIR}/${DATA_TYPE}/tfrecords"
-  if [[ ! -d "${TF_RECORDS}_${SPLIT_PERCENT}" ]]; then
-    log "${TF_RECORDS}_${SPLIT_PERCENT} not found"
-    if [[ ! -f "${TF_RECORDS}_${SPLIT_PERCENT}.tar" ]]; then
-      log "Downloading training data from S3"
-      sudo cp "${S3_DIR}_${SPLIT_PERCENT}.tar" /data/
-      sudo chown ubuntu: "${TF_RECORDS}_${SPLIT_PERCENT}.tar"
-      chmod 644 "${TF_RECORDS}_${SPLIT_PERCENT}.tar"
-    fi
-    log "Extracting training data"
-    tar xf "${TF_RECORDS}_${SPLIT_PERCENT}.tar" -C "$(dirname "$TF_RECORDS")"
-  fi
-  log "Creating symbolic link"
-  rm -f "${TF_RECORDS}"
-  ln -s "${TF_RECORDS}_${SPLIT_PERCENT}" "${TF_RECORDS}"
+function fetch_data() {
+  local out_dir=$(dirname "$TF_RECORDS")
+  mkdir -p "$out_dir"
 
+  local records="BigEarthNet_tfrecords_balanced"
+  if [[ "$DATA_TYPE" == "expanded" ]]; then
+    records="${records}_expanded"
+  fi
+
+  log "Extracting training data"
+  sudo tar xf "${S3_DIR}/${records}/tfrecords_${SPLIT_PERCENT}.tar" \
+    -C "$out_dir" \
+    --exclude="tfrecords_${SPLIT_PERCENT}/train.tfrecord" \
+    --exclude="tfrecords_${SPLIT_PERCENT}/val.tfrecord" \
+    --owner=ubuntu \
+    --group=ubuntu \
+    --no-same-permissions
+
+  [[ -d "${out_dir}/tfrecords_test/test" ]] && return
+
+  log "Extracting test data"
+  sudo tar xf "${S3_DIR}/${records}/tfrecords_test.tar" \
+    -C "$out_dir" \
+    --exclude="tfrecords_${SPLIT_PERCENT}/test.tfrecord" \
+    --owner=ubuntu \
+    --group=ubuntu \
+    --no-same-permissions
+}
+
+function set_vars() {
+  TF_RECORDS="${DATA_DIR}/${DATA_TYPE}/tfrecords"
   OUTPUT_PREFIX="${SPLIT_PERCENT}_${ARCH}_E${EPOCHS}_B${BATCH_SIZE}_${AUGMENT_STR}"
   if [[ -n "${LABELS:-}" ]]; then
     OUTPUT_PREFIX="${OUTPUT_PREFIX}_${LABELS}"
@@ -164,6 +183,23 @@ function prepare() {
   OUTPUT_PREFIX="${OUTPUT_PREFIX}-${DATE}"
   TRAIN_DATA="${TF_RECORDS}/train"
   VAL_DATA="${TF_RECORDS}/val"
+
+  MODEL_DIR="$MODEL_TYPE"
+  if [[ "$DATA_TYPE" == "expanded" ]]; then
+    MODEL_DIR="${MODEL_TYPE}_ex"
+  fi
+}
+
+function prepare() {
+  mkdir -p "${OUTPUT_DIR}/${MODEL_TYPE}"
+  if [[ ! -d "${TF_RECORDS}_${SPLIT_PERCENT}" ]]; then
+    warn "${TF_RECORDS}_${SPLIT_PERCENT} not found"
+    fetch_data
+  fi
+
+  log "Creating symbolic link"
+  rm -f "${TF_RECORDS}"
+  ln -s "${TF_RECORDS}_${SPLIT_PERCENT}" "${TF_RECORDS}"
 }
 
 function prompt_settings() {
@@ -185,6 +221,7 @@ function remove_container() {
 function baseline_training() {
   TEST_DIR="${DATA_DIR}/${DATA_TYPE}/tfrecords_test/test"
   DOCKER_NAME="training_$(date '+%Y%m%d%H%M%S')"
+
   trap remove_container EXIT
   docker run --gpus all --name "$DOCKER_NAME" \
     --user $(id -u):$(id -g) \
@@ -210,7 +247,7 @@ function baseline_training() {
   remove_container
 }
 
-function default_training() {
+function train() {
   TRAIN_DATA="${DATA_DIR}/train"
   VAL_DATA="${DATA_DIR}/val"
   local arch=${ARCH:-}
@@ -221,9 +258,17 @@ function default_training() {
   if [[ -z "$split" ]] || [[ "$split" == "all" ]]; then
     split="1 3 10 25 50 100"
   fi
-  for ARCH in $(echo $arch); do
-    for SPLIT in $(echo $split); do
-      SPLIT_PERCENT="${SPLIT}_percent"
+  for SPLIT in $(echo $split); do
+    SPLIT_PERCENT="${SPLIT}_percent"
+    for ARCH in $(echo $arch); do
+      set_vars
+      if [[ -f "${OUTPUT_DIR}/${MODEL_DIR}/${OUTPUT_PREFIX}.log" ]]; then
+        if [[ "${FORCE:-}" != "true" ]]; then
+          warn "${OUTPUT_PREFIX} already trained, skipping..."
+          continue
+        fi
+      fi
+      log "Training: ${OUTPUT_PREFIX}"
       prepare
       $TRAIN_FUNCTION
     done
@@ -253,6 +298,11 @@ while true; do
     shift 2
     continue
     ;;
+  '-f' | '--force')
+    FORCE=true
+    shift
+    continue
+    ;;
   '--')
     shift
     break
@@ -262,11 +312,11 @@ done
 
 case "${MODEL:-NONE}" in
 'baseline')
-  MODEL_DIR=supervised_baseline
+  MODEL_TYPE=supervised_baseline
   TRAIN_FUNCTION=baseline_training
   ;;
 'baseline-pretrained')
-  MODEL_DIR=supervised_baseline_pretrained
+  MODEL_TYPE=supervised_baseline_pretrained
   TRAIN_FUNCTION=baseline_training
   PRETRAIN=True
   EXTRA_ARGS="--pretrained"
@@ -290,6 +340,6 @@ if [[ -z "${PROMPT:-}" ]]; then
   prompt_settings
 fi
 proceed
-default_training
+train
 
 exit 1
