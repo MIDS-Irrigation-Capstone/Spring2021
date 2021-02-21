@@ -42,20 +42,6 @@ METRICS = [
 ]
 
 
-def dataset_length(data_dir):
-    input_files = tf.io.gfile.glob(os.path.join(data_dir, "*"))
-    data_set = tf.data.TFRecordDataset(input_files)
-    return sum(1 for record in data_set)
-
-
-def get_dataset(filename, batch_size, justRGB, expanded):
-    if os.path.isdir(filename):
-        filename = [f for f in glob(os.path.join(filename, "*.tfrecord"))]
-    elif not os.path.isfile(filename):
-        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), filename)
-
-    return get_batched_dataset(filename, batch_size, justRGB, expanded_labels=expanded)
-
 
 def build_model(
     imported_model, use_pretrain, metrics=METRICS, output_bias=None, dropout=0.25

@@ -1,4 +1,6 @@
 import tensorflow as tf
+import os
+from glob import glob
 import cv2
 import numpy as np
 import time
@@ -7,6 +9,21 @@ from tensorflow.keras.preprocessing import image
 
 JUSTRGB = False
 EXPANDED_LABELS = True
+
+
+def dataset_length(data_dir):
+    input_files = tf.io.gfile.glob(os.path.join(data_dir, "*"))
+    data_set = tf.data.TFRecordDataset(input_files)
+    return sum(1 for record in data_set)
+
+
+def get_dataset(filename, batch_size, justRGB=False, expanded=False,ca_flag=False,simclr=False):
+    if os.path.isdir(filename):
+        filename = [f for f in glob(os.path.join(filename, "*.tfrecord"))]
+    elif not os.path.isfile(filename):
+        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), filename)
+
+    return get_batched_dataset(filename, batch_size, justRGB, expanded_labels=expanded, ca=ca_flag,simclr=simclr)
 
 
 def _get_binary_label(example):
@@ -262,7 +279,7 @@ def read_ca_tfrecord(example):
 def get_batched_dataset(
     filenames,
     batch_size,
-    justRGB,
+    justRGB=False,
     augment=False,
     simclr=False,
     ca=False,
