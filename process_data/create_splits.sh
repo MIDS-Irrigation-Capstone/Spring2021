@@ -5,7 +5,7 @@ IFS=$'\n\t'
 
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
-OUT_DIR="$(pwd)/balanced_splits"
+OUT_DIR="$(pwd)/balanced_splits_expanded"
 
 function log() {
   msg=${1:-}
@@ -19,7 +19,8 @@ mkdir -p tmp
 pushd tmp
 
 log "Splitting irrigated and non-irrigated records"
-grep "Permanently irrigated land" ../big_earth_net_labels.txt | awk '{print $ 1}' | shuf >irrigated_records
+# grep "Permanently irrigated land" ../big_earth_net_labels.txt | awk '{print $ 1}' | shuf >irrigated_records
+egrep "(Permanently irrigated land|Rice fields|Vineyards|Fruit trees and berry plantations|Olive groves)" ../big_earth_net_labels.txt | awk '{print $1}' | shuf >irrigated_records
 RECORD_LEN=$(wc -l <irrigated_records)
 grep -vf irrigated_records ../big_earth_net_labels.txt | awk '{print $ 1}' | shuf -n "$RECORD_LEN" >non_irrigated_records
 

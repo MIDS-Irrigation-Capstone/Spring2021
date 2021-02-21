@@ -5,7 +5,21 @@ import time
 from tensorflow.keras.preprocessing import image
 
 
-JUSTRGB=False
+JUSTRGB = False
+EXPANDED_LABELS = True
+
+
+def _get_binary_label(example):
+    if not EXPANDED_LABELS:
+        return example["original_labels_multi_hot"][tf.constant(12)]
+    return (
+        example["original_labels_multi_hot"][tf.constant(12)]
+        | example["original_labels_multi_hot"][tf.constant(13)]
+        | example["original_labels_multi_hot"][tf.constant(14)]
+        | example["original_labels_multi_hot"][tf.constant(15)]
+        | example["original_labels_multi_hot"][tf.constant(16)]
+    )
+
 
 def read_tfrecord(example):
     """
@@ -76,7 +90,7 @@ def read_tfrecord(example):
         },
     )
 
-    example["binary_label"] = example["original_labels_multi_hot"][tf.constant(12)]
+    example["binary_label"] = _get_binary_label(example)
 
     # After parsing our data into a tensor, let's standardize and reshape.
     reshaped_example = {
@@ -122,15 +136,20 @@ def read_tfrecord(example):
     )
 
     # SG: for ImageNet pretrained models we can just pass the three RGB channels
-    if JUSTRGB :
-        img = tf.stack([reshaped_example["B04"],
-                        reshaped_example["B03"],
-                        reshaped_example["B02"],
-                        ], axis=2)
-    else :
+    if JUSTRGB:
+        img = tf.stack(
+            [
+                reshaped_example["B04"],
+                reshaped_example["B03"],
+                reshaped_example["B02"],
+            ],
+            axis=2,
+        )
+    else:
         # Finally resize the 20m data and stack the bands together.
         img = tf.concat(
-            [bands_10m, tf.image.resize(bands_20m, [120, 120], method="bicubic")], axis=2
+            [bands_10m, tf.image.resize(bands_20m, [120, 120], method="bicubic")],
+            axis=2,
         )
 
     multi_hot_label = reshaped_example["original_labels_multi_hot"]
@@ -240,7 +259,15 @@ def read_ca_tfrecord(example):
     return img, 0
 
 
-def get_batched_dataset(filenames, batch_size, justRGB, augment=False, simclr=False, ca=False):
+def get_batched_dataset(
+    filenames,
+    batch_size,
+    justRGB,
+    augment=False,
+    simclr=False,
+    ca=False,
+    expanded_labels=True,
+):
     """
     This function is used to return a batch generator for training our tensorflow model.
     basically we read from different tfrecords files, and shuffle our records.
@@ -248,8 +275,9 @@ def get_batched_dataset(filenames, batch_size, justRGB, augment=False, simclr=Fa
     Finally - if it is a SimCLR model do not repeat the dataset, as we manually loop over our data
     and train our model in the simclr.py script.
     """
-    global JUSTRGB
-    JUSTRGB=justRGB
+    global JUSTRGB, EXPANDED_LABELS
+    JUSTRGB = justRGB
+    EXPANDED_LABELS = expanded_labels
 
     option_no_order = tf.data.Options()
     option_no_order.experimental_deterministic = False

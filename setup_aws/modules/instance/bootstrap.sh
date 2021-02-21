@@ -91,15 +91,19 @@ EOF
 docker pull imander/irgapp
 
 ### extract tfrecords
-for percent in 1_percent 3_percent 10_percent 25_percent 50_percent 100_percent test; do
-  tar xf "/mnt/irrigation_data/BigEarthNet_tfrecords_balanced/tfrecords_${percent}.tar" \
-    -C /data \
-    --exclude="tfrecords_${percent}/train.tfrecord" \
-    --exclude="tfrecords_${percent}/test.tfrecord" \
-    --exclude="tfrecords_${percent}/val.tfrecord" \
-    --owner=ubuntu \
-    --group=ubuntu \
-    --no-same-permissions
+for data_dir in $(ls -1 /mnt/irrigation_data/ | grep balanced); do
+  extract_dir="/data/${data_dir##*_}"
+  mkdir -pm 777 "$extract_dir"
+  for percent in 1_percent 3_percent 10_percent 25_percent 50_percent 100_percent test; do
+    tar xf "$data_dir/tfrecords_${percent}.tar" \
+      -C "$extract_dir" \
+      --exclude="tfrecords_${percent}/train.tfrecord" \
+      --exclude="tfrecords_${percent}/test.tfrecord" \
+      --exclude="tfrecords_${percent}/val.tfrecord" \
+      --owner=ubuntu \
+      --group=ubuntu \
+      --no-same-permissions
+  done
 done
 
 exit 0
