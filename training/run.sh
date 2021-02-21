@@ -95,7 +95,7 @@ function selectWithDefault() {
 
 function get_architecture() {
   echo "Choose Training Architecture"
-  ARCH=$(selectWithDefault 'all' 'ResNet50' 'InceptionV3' 'Xception' 'ResNet101V2')
+  ARCH=$(selectWithDefault 'all' 'ResNet50' 'ResNet152' 'InceptionV3' 'Xception' 'ResNet101V2')
 }
 
 function get_epochs() {

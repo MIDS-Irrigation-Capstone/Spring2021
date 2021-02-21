@@ -3,21 +3,37 @@
 set -euo pipefail
 IFS=$'\n\t'
 
-# Add nvidia-docker repo
-source /etc/os-release
-distribution="$ID$VERSION_ID"
-curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | apt-key add -
-curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | tee /etc/apt/sources.list.d/nvidia-docker.list
+function install_docker() {
+  # Add nvidia-docker repo
+  source /etc/os-release
+  distribution="$ID$VERSION_ID"
+  curl -s -L https://nvidia.github.io/nvidia-docker/gpgkey | apt-key add -
+  curl -s -L https://nvidia.github.io/nvidia-docker/$distribution/nvidia-docker.list | tee /etc/apt/sources.list.d/nvidia-docker.list
+
+  apt-get update && apt-get install -y docker.io docker-compose nvidia-docker2
+
+  # install Nvidia drivers if running on GPU
+  if lshw | grep -qi nvidia; then
+    apt-get install linux-headers-$(uname -r)
+    distribution=$(echo $distribution | sed -e 's/\.//g')
+    wget https://developer.download.nvidia.com/compute/cuda/repos/$distribution/x86_64/cuda-$distribution.pin
+    mv cuda-$distribution.pin /etc/apt/preferences.d/cuda-repository-pin-600
+    apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/$distribution/x86_64/7fa2af80.pub
+    echo "deb http://developer.download.nvidia.com/compute/cuda/repos/$distribution/x86_64 /" | sudo tee /etc/apt/sources.list.d/cuda.list
+    apt-get update
+    apt-get -y install cuda-drivers
+    export PATH=/usr/local/cuda-11.2/bin${PATH:+:${PATH}}
+    echo 'export PATH=/usr/local/cuda-11.2/bin${PATH:+:${PATH}}' >>/home/ubuntu/.profile
+    /usr/bin/nvidia-persistenced --verbose
+    # test that nvidia docker is working
+    docker run --rm --gpus all nvidia/cuda:11.0-base nvidia-smi
+  fi
+}
 
 # Install dependencies
 apt-get update
-apt-get install -y \
-  awscli \
-  docker.io \
-  docker-compose \
-  jq \
-  nvidia-docker2 \
-  s3fs
+apt-get install -y awscli jq s3fs
+systemctl status docker.service || install_docker
 
 ### Ensure data volume is formatted and mounted
 mkdir -pm 777 /data
@@ -47,23 +63,6 @@ EOF
 systemctl start docker.service
 usermod -a -G docker ubuntu
 chmod 777 /data
-
-# install Nvidia drivers if running on GPU
-if lshw | grep -qi nvidia; then
-  apt-get install linux-headers-$(uname -r)
-  distribution=$(echo $distribution | sed -e 's/\.//g')
-  wget https://developer.download.nvidia.com/compute/cuda/repos/$distribution/x86_64/cuda-$distribution.pin
-  mv cuda-$distribution.pin /etc/apt/preferences.d/cuda-repository-pin-600
-  apt-key adv --fetch-keys https://developer.download.nvidia.com/compute/cuda/repos/$distribution/x86_64/7fa2af80.pub
-  echo "deb http://developer.download.nvidia.com/compute/cuda/repos/$distribution/x86_64 /" | sudo tee /etc/apt/sources.list.d/cuda.list
-  apt-get update
-  apt-get -y install cuda-drivers
-  export PATH=/usr/local/cuda-11.2/bin${PATH:+:${PATH}}
-  echo 'export PATH=/usr/local/cuda-11.2/bin${PATH:+:${PATH}}' >>/home/ubuntu/.profile
-  /usr/bin/nvidia-persistenced --verbose
-  # test that nvidia docker is working
-  docker run --rm --gpus all nvidia/cuda:11.0-base nvidia-smi
-fi
 
 ### Mount S3
 mkdir -pm 777 /mnt/irrigation_data
@@ -95,6 +94,7 @@ for data_dir in $(ls -1 /mnt/irrigation_data/ | grep balanced); do
   extract_dir="/data/${data_dir##*_}"
   mkdir -pm 777 "$extract_dir"
   for percent in 1_percent 3_percent 10_percent 25_percent 50_percent 100_percent test; do
+    echo "extracting /mnt/irrigation_data/$data_dir/tfrecords_${percent}.tar"
     tar xf "/mnt/irrigation_data/$data_dir/tfrecords_${percent}.tar" \
       -C "$extract_dir" \
       --exclude="tfrecords_${percent}/train.tfrecord" \
