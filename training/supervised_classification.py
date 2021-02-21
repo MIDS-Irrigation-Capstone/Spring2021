@@ -15,7 +15,7 @@ import tensorflow as tf
 
 # import seaborn as sns
 # from matplotlib.cm import get_cmap
-from tensorflow.keras.applications import ResNet50, ResNet101V2, Xception, InceptionV3
+from tensorflow.keras.applications import ResNet50, ResNet101V2, ResNet152, Xception, InceptionV3
 from tensorflow.keras.preprocessing import image
 from tensorflow.keras.applications.resnet50 import preprocess_input, decode_predictions
 
@@ -53,7 +53,8 @@ def get_dataset(filename, batch_size, justRGB, expanded):
         filename = [f for f in glob(os.path.join(filename, "*.tfrecord"))]
     elif not os.path.isfile(filename):
         raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), filename)
-    return get_batched_dataset(filename, batch_size, justRGB, expanded)
+
+    return get_batched_dataset(filename, batch_size, justRGB, expanded_labels=expanded)
 
 
 def build_model(
@@ -307,7 +308,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "-a",
         "--arch",
-        choices=["ResNet50", "ResNet101V2", "Xception", "InceptionV3"],
+        choices=["ResNet50", "ResNet101V2", "ResNet152", "Xception", "InceptionV3"],
         default="ResNet50",
         help="Class of Model Architecture to use for classification",
     )
@@ -382,6 +383,7 @@ if __name__ == "__main__":
     arch_dict = {
         "ResNet50": ResNet50,
         "ResNet101V2": ResNet101V2,
+        "ResNet152": ResNet152,
         "Xception": Xception,
         "InceptionV3": InceptionV3,
     }
