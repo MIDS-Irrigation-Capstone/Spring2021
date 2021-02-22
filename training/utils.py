@@ -12,8 +12,14 @@ EXPANDED_LABELS = True
 
 
 def dataset_length(data_dir):
-    input_files = tf.io.gfile.glob(os.path.join(data_dir, "*"))
-    data_set = tf.data.TFRecordDataset(input_files)
+    if os.path.isdir(data_dir):
+        input_files = tf.io.gfile.glob(os.path.join(data_dir, "*"))
+        data_set = tf.data.TFRecordDataset(input_files)
+    elif os.path.isfile(data_dir):
+        data_set = tf.data.TFRecordDataset(data_dir)
+    else :
+        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), data_dir)
+
     return sum(1 for record in data_set)
 
 
