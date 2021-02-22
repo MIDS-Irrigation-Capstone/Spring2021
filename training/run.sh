@@ -18,7 +18,6 @@ AUGMENT=False
 AUGMENT_STR=noaug
 WEIGHTS=False
 
-DATE=$(date '+%Y%m%d')
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
@@ -180,7 +179,7 @@ function set_vars() {
   if [[ -n "${LABELS:-}" ]]; then
     OUTPUT_PREFIX="${OUTPUT_PREFIX}_${LABELS}"
   fi
-  OUTPUT_PREFIX="${OUTPUT_PREFIX}-${DATE}"
+  OUTPUT_PREFIX="${OUTPUT_PREFIX}"
   TRAIN_DATA="${TF_RECORDS}/train"
   VAL_DATA="${TF_RECORDS}/val"
 
@@ -191,7 +190,8 @@ function set_vars() {
 }
 
 function prepare() {
-  mkdir -p "${OUTPUT_DIR}/${MODEL_TYPE}"
+  log "Saving output to ${OUTPUT_DIR}/${MODEL_DIR}"
+  mkdir -p "${OUTPUT_DIR}/${MODEL_DIR}"
   if [[ ! -d "${TF_RECORDS}_${SPLIT_PERCENT}" ]]; then
     warn "${TF_RECORDS}_${SPLIT_PERCENT} not found"
     fetch_data
@@ -252,7 +252,7 @@ function train() {
   VAL_DATA="${DATA_DIR}/val"
   local arch=${ARCH:-}
   if [[ -z "$arch" ]] || [[ "$arch" == "all" ]]; then
-    arch="ResNet50 InceptionV3 Xception ResNet101V2"
+    arch="ResNet50 InceptionV3 Xception ResNet101V2 ResNet152"
   fi
   split=${SPLIT_PERCENT:-}
   if [[ -z "$split" ]] || [[ "$split" == "all" ]]; then
@@ -267,6 +267,7 @@ function train() {
           warn "${OUTPUT_PREFIX} already trained, skipping..."
           continue
         fi
+        warn "${OUTPUT_PREFIX} will be overwritten"
       fi
       log "Training: ${OUTPUT_PREFIX}"
       prepare
