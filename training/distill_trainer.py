@@ -86,17 +86,28 @@ def run_model(teacher_model_path, architecture, training_dataset, args) :
         # Loop over batches
         for step in tqdm(range(steps_per_epoch)):
             batch = batch_generator.get_next()
-
             # Get teacher prediction on batches labels
-            distill_labels = np.rint(teacher_model.predict(batch[0]))
+            distill_labels = np.squeeze(np.rint(teacher_model.predict(batch[0]))).astype("int")
 
             stats = student.train_on_batch(batch[0], distill_labels, return_dict=True,)
 
-            print(step, "Stats:", stats)
+            # TODO store stats for saving to file later?
+            print(step, distill_labels,"Stats:", stats)
 
+        # TODO add validation stat?
+
+    # Eval model on Test dataset
+    test_data = get_dataset(args.test_set, batch_size=args.BATCH_SIZE, expanded=args.expanded_labels)
+    test_steps = dataset_length(args.test_set) // args.BATCH_SIZE
+
+    test_stats = student.evaluate(test_data, steps=test_steps, return_dict=True)
+    df = pd.DataFrame.from_dict(test_stats, orient="index")
+    print("test_stats",test_stats)
 
     # Save student out to disk
     student.save(f'{args.output_dir}/{args.output}.h5')
+    df.to_pickle(f'{args.output_dir}/{args.output}.pkl')
+
 
 if __name__ == '__main__':
     
@@ -141,6 +152,17 @@ if __name__ == '__main__':
                         action="store_true",
                         help="Whether to use expanded irrigation labels",)
 
+    parser.add_argument(
+        "--validation-set",
+        type=str,
+        help="Path to tfrecords for validation set",
+    )
+
+    parser.add_argument(
+        "--test-set",
+        type=str, required=True,
+        help="Path to tfrecords for test set",
+    )
 
     args = parser.parse_args()
 
