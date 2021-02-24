@@ -245,7 +245,7 @@ if __name__ == '__main__':
     parser.add_argument('-c', '--CALIFORNIA', default='False', type=str,
                         help="are you running with california data")
     parser.add_argument('-d', '--train_data', default=None, type=str,
-                        help="Folder or filepath to tf records for trainging.")
+                        help="Folder or filepath to tf records for training.")
     parser.add_argument("--expanded-labels",
                         action="store_true",
                         help="Whether to use expanded irrigation labels",
