@@ -6,7 +6,8 @@ import tensorflow as tf
 import traceback
 import sys
 
-BAND_NAMES = ['B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B8A', 'B9', 'B11', 'B12']
+# It appears that we are only interested in the 10nm and 20nm bands. So getting rid of B1 and B9
+BAND_NAMES = ['B2', 'B3', 'B4', 'B5', 'B6', 'B7', 'B8', 'B8A', 'B11', 'B12']
 
 # According to Sentinel guide all MSI data is scaled by factor of 10000
 SCALE_FACTOR = 1 #10000
@@ -43,9 +44,6 @@ def prep_example(ia_list, TFRecord_writer):
                         "B8A": tf.train.Feature(
                             int64_list=tf.train.Int64List(value=np.ravel(ia_list[key]["B8A"]))
                         ),
-                        "B09": tf.train.Feature(
-                            int64_list=tf.train.Int64List(value=np.ravel(ia_list[key]["B9"]))
-                        ),
                         "B11": tf.train.Feature(
                             int64_list=tf.train.Int64List(value=np.ravel(ia_list[key]["B11"]))
                         ),
@@ -54,6 +52,9 @@ def prep_example(ia_list, TFRecord_writer):
                         ),
                         "patch_name": tf.train.Feature(
                             bytes_list=tf.train.BytesList(value=[ia_list[key]['patch_name'].encode("utf-8")])
+                        ),
+                        "month": tf.train.Feature(
+                            bytes_list=tf.train.BytesList(value=[str(ia_list[key]['month']).encode("utf-8")])
                         ),
                     }
                 )
@@ -104,7 +105,8 @@ def split_convert2TFrecord(TFRecord_writer,
                             ia_list[key] = {}
                             ia_list[key]['patch_name'] = base_path
                             ia_list[key]['month'] = month
-                        ia_list[key][band] = (np.int_(ia / scale))
+                        #ia_list[key][band] = (np.int_(ia / scale))
+                        ia_list[key][band] = (np.int_(ia))
 
 
         # Create TfRecords for the split msi
@@ -149,7 +151,7 @@ def create_split(root_folder,
 
     tfwriter.close()
 
-ROOT_FOLDER = '/data/gee_california'
+ROOT_FOLDER = '/home/cagastya/hdd/gee_california'
 OUT_FOLDER = '/home/cagastya/MIDS_Capstone/data/Tfrecords.CA'
 
 if __name__ == "__main__":
