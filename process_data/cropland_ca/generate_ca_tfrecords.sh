@@ -6,8 +6,8 @@ IFS=$'\n\t'
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
-CA_ROOT="/data/gee_california"
-PROCESSING_DIR="/data/process_data"
+CA_ROOT="/mnt/irrigation_data/gee_california/"
+PROCESSING_DIR="/home/ubuntu/repos/Spring2021/process_data/cropland_ca/"
 S3_BUCKET="s3://mids-capstone-irrigation-detection/CA_tfrecords"
 
 function log() {
@@ -37,10 +37,6 @@ function generate_tfrecords() {
 
   echo
   log "Sharding tfrecords files"
-  for file in $@; do
-    data_type=$(basename "$file")
-    mkdir -p "${PROCESSING_DIR}/tfrecords/${data_type}"
-  done
   shard_records
 
   log "Creating tarball: ${OUT_DIR}.tar"
@@ -57,6 +53,6 @@ function generate_tfrecords() {
 
 log "Processing CA data set"
 OUT_DIR="tfrecords_ca"
-generate_tfrecords 
+generate_tfrecords
 
 exit 0

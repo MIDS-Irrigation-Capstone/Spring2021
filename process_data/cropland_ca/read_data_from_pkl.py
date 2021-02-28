@@ -1,8 +1,8 @@
 # This is a test script to check what has been pickled for the image patch files
-ROOT='/home/cagastya/hdd/CroplandDataSet/Sentinel2/Irrigated/S2SR_0_2019_35.22734228_-111.5437402'
-FILENAME = 'S2SR_0_2019_35.22734228_-111.5437402.pkl'
+ROOT='/home/cagastya/hdd/gee_california/S2SR_10_2019_32.625_-115.125'
+FILENAME = 'S2SR_10_2019_32.625_-115.125.pkl'
 RP1 = '/hdd/BigEarthNet-v1.0/S2A_MSIL2A_20170717T113321_28_87'
-FN1 = 'S2A_MSIL2A_20170717T113321_28_87_B01.tif'
+FN1 = 'S2A_MSIL2A_20170717T113321_28_87_B06.tif'
 
 import pickle
 from os import path
