@@ -1,5 +1,6 @@
 import tensorflow as tf
 import os
+import errno
 from glob import glob
 import cv2
 import numpy as np
@@ -340,32 +341,41 @@ class TimeHistory(tf.keras.callbacks.Callback):
 
 
 class Augment:
+    # Default augmentations are on, can be turned on individually if parameters provided
+    def __init__(self, blur=True,brightness=True,contrast=True,gain=True):
+        self.blur = blur
+        self.brightness = brightness
+        self.contrast = contrast
+        self.gain = gain
+
+        self.scale = 0.5
+
     def augfunc(self, sample):
+        scale = 0.5
         # Randomly apply transformation (color distortions) with probability p.
-        sample = self._random_apply(self._color_jitter, sample, p=0.8)
-        sample = self._random_apply(self._color_drop, sample, p=0.2)
-        sample = self._random_apply(self._blur, sample, p=0.5)
+        if self.brightness :
+            sample = self._random_apply(self._brightness, sample, p=0.8)
+
+        if self.contrast :
+            sample = self._random_apply(self._contrast, sample, p=0.8)
+
+        if self.gain :
+            sample = self._random_apply(self._gain, sample, p=0.8)
+
+        if self.blur :
+            sample = self._random_apply(self._blur, sample, p=0.5)
 
         return sample
 
-    def _color_jitter(self, x, s=0.50):
-        # one can also shuffle the order of following augmentations
-        # each time they are applied.
-        x = tf.image.random_brightness(x, max_delta=0.8 * s)
-        x = tf.image.random_contrast(x, lower=1 - 0.8 * s, upper=1 + 0.8 * s)
-        dx = tf.image.random_saturation(
-            x[:, :, :3], lower=1 - 0.8 * s, upper=1 + 0.8 * s
-        )
-        dx = tf.image.random_hue(dx, max_delta=0.2 * s)
-        x = tf.concat([dx, x[:, :, 3:]], axis=2)
-        x = tf.clip_by_value(x, 0, 1)
-        return x
+    def _brightness(self, x):
+        return tf.image.random_brightness(x, max_delta=0.8 * self.scale)
 
-    def _color_drop(self, x):
-        dx = tf.image.rgb_to_grayscale(x[:, :, :3])
-        dx = tf.tile(dx, [1, 1, 3])
-        x = tf.concat([dx, x[:, :, 3:]], axis=2)
-        return x
+    def _contrast(self, x):
+        return tf.image.random_contrast(x, lower=1-0.8*self.scale, upper=1+0.8*self.scale)
+
+    def _gain(self, x):
+        g = np.random.uniform(-self.scale, self.scale)
+        return tf.image.adjust_gamma(x, gamma=1., gain=g)
 
     def _blur(self, x):
         # SimClr implementation is applied at 10% of image size with a random sigma

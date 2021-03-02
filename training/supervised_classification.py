@@ -116,7 +116,7 @@ def _color_jitter(x, s=1):
     dx = tf.image.random_saturation(x[:, :, :3], lower=1 - 0.8 * s, upper=1 + 0.8 * s)
     dx = tf.image.random_hue(dx, max_delta=0.2 * s)
     x = tf.concat([dx, x[:, :, 3:]], axis=2)
-    x = tf.clip_by_value(x, 0, 1)
+    #x = tf.clip_by_value(x, 0, 1) #SG: very bad!
     return x
 
 
