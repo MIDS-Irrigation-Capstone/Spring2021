@@ -351,7 +351,6 @@ class Augment:
         self.scale = 0.5
 
     def augfunc(self, sample):
-        scale = 0.5
         # Randomly apply transformation (color distortions) with probability p.
         if self.brightness :
             sample = self._random_apply(self._brightness, sample, p=0.8)
@@ -363,7 +362,7 @@ class Augment:
             sample = self._random_apply(self._gain, sample, p=0.8)
 
         if self.blur :
-            sample = self._random_apply(self._blur, sample, p=0.5)
+            sample = self._random_apply(self._blur, sample, p=0.8)
 
         return sample
 
