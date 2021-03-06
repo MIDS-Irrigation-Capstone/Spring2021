@@ -29,6 +29,17 @@ resource "aws_iam_role_policy" "mids" {
       "Effect": "Allow",
       "Action": ["secretsmanager:GetSecretValue"],
       "Resource": ["arn:aws:secretsmanager:us-west-2:672750028551:secret:github-5LKXx9"]
+    },
+    {
+      "Effect": "Allow",
+      "Action": [
+        "kms:Encrypt",
+        "kms:Decrypt",
+        "kms:ReEncrypt*",
+        "kms:GenerateDataKey*",
+        "kms:DescribeKey"
+      ],
+      "Resource": ["arn:aws:kms:us-west-2:672750028551:key/ed81d25b-fcbd-4b39-98b4-4986e03158bb"]
     }
   ]
 }
@@ -56,9 +67,8 @@ resource "aws_iam_role" "mids" {
 EOF
 }
 
-resource "aws_spot_instance_request" "mids" {
+resource "aws_instance" "mids" {
   ami                    = var.ami_id
-  spot_price             = var.spot_price
   instance_type          = var.instance_type
   iam_instance_profile   = aws_iam_instance_profile.mids.name
   key_name               = var.key_name
@@ -76,4 +86,25 @@ resource "aws_spot_instance_request" "mids" {
     volume_size = var.volume_size
   }
 }
+
+/* resource "aws_spot_instance_request" "mids" { */
+/*   ami                    = var.ami_id */
+/*   spot_price             = var.spot_price */
+/*   instance_type          = var.instance_type */
+/*   iam_instance_profile   = aws_iam_instance_profile.mids.name */
+/*   key_name               = var.key_name */
+/*   vpc_security_group_ids = var.sg_ids */
+/*   subnet_id              = var.subnet_id */
+/*   availability_zone      = var.availability_zone */
+/*   user_data              = file("modules/instance/bootstrap.sh") */
+
+/*   tags = { */
+/*     Name = "MIDS-Capstone" */
+/*   } */
+
+/*   ebs_block_device { */
+/*     device_name = "/dev/sdh" */
+/*     volume_size = var.volume_size */
+/*   } */
+/* } */
 
