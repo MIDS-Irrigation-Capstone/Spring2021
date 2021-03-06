@@ -2,6 +2,7 @@ import tensorflow as tf
 import os
 import errno
 from glob import glob
+
 import cv2
 import numpy as np
 import time
@@ -12,25 +13,35 @@ JUSTRGB = False
 EXPANDED_LABELS = True
 
 
+@tf.function
 def dataset_length(data_dir):
     if os.path.isdir(data_dir):
         input_files = tf.io.gfile.glob(os.path.join(data_dir, "*"))
         data_set = tf.data.TFRecordDataset(input_files)
     elif os.path.isfile(data_dir):
         data_set = tf.data.TFRecordDataset(data_dir)
-    else :
+    else:
         raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), data_dir)
 
-    return sum(1 for record in data_set)
+    return sum(1 for record in iter(data_set))
 
 
-def get_dataset(filename, batch_size, justRGB=False, expanded=False,ca_flag=False,simclr=False):
+def get_dataset(
+    filename, batch_size, justRGB=False, expanded=False, ca_flag=False, simclr=False
+):
     if os.path.isdir(filename):
         filename = [f for f in glob(os.path.join(filename, "*.tfrecord"))]
     elif not os.path.isfile(filename):
         raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), filename)
 
-    return get_batched_dataset(filename, batch_size, justRGB, expanded_labels=expanded, ca=ca_flag,simclr=simclr)
+    return get_batched_dataset(
+        filename,
+        batch_size,
+        justRGB,
+        expanded_labels=expanded,
+        ca=ca_flag,
+        simclr=simclr,
+    )
 
 
 def _get_binary_label(example):
@@ -342,26 +353,26 @@ class TimeHistory(tf.keras.callbacks.Callback):
 
 class Augment:
     # Default augmentations are on, can be turned on individually if parameters provided
-    def __init__(self, blur=True,brightness=True,contrast=True,gain=True):
-        self.blur = blur
-        self.brightness = brightness
-        self.contrast = contrast
-        self.gain = gain
+    def __init__(self, augmentations):
+        self.blur = "blur" in augmentations
+        self.brightness = "brightness" in augmentations
+        self.contrast = "contrast" in augmentations
+        self.gain = "gain" in augmentations
 
         self.scale = 0.5
 
     def augfunc(self, sample):
         # Randomly apply transformation (color distortions) with probability p.
-        if self.brightness :
+        if self.brightness:
             sample = self._random_apply(self._brightness, sample, p=0.8)
 
-        if self.contrast :
+        if self.contrast:
             sample = self._random_apply(self._contrast, sample, p=0.8)
 
-        if self.gain :
+        if self.gain:
             sample = self._random_apply(self._gain, sample, p=0.8)
 
-        if self.blur :
+        if self.blur:
             sample = self._random_apply(self._blur, sample, p=0.8)
 
         return sample
@@ -370,11 +381,13 @@ class Augment:
         return tf.image.random_brightness(x, max_delta=0.8 * self.scale)
 
     def _contrast(self, x):
-        return tf.image.random_contrast(x, lower=1-0.8*self.scale, upper=1+0.8*self.scale)
+        return tf.image.random_contrast(
+            x, lower=1 - 0.8 * self.scale, upper=1 + 0.8 * self.scale
+        )
 
     def _gain(self, x):
         g = np.random.uniform(-self.scale, self.scale)
-        return tf.image.adjust_gamma(x, gamma=1., gain=g)
+        return tf.image.adjust_gamma(x, gamma=1.0, gain=g)
 
     def _blur(self, x):
         # SimClr implementation is applied at 10% of image size with a random sigma
