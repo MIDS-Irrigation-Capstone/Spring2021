@@ -203,7 +203,8 @@ def run_model(
     print(f'\tBlur:       {"blur" in augmentations}')
     print(f'\tBrightness: {"brightness" in augmentations}')
     print(f'\tcontrast:   {"contrast" in augmentations}')
-    print(f'\tGain:       {"gain" in augmentations}\n')
+    print(f'\tGain:       {"gain" in augmentations}')
+    print(f'\tSpeckle:    {"speckle" in augmentations}\n')
 
     # Use Keras to augment images in batches
     datagen = image.ImageDataGenerator(
@@ -269,6 +270,7 @@ def run_model(
     df["brightness"] = "brightness" in augmentations
     df["contrast"] = "contrast" in augmentations
     df["gain"] = "gain" in augmentations
+    df["speckle"] = "speckle" in augmentations
 
     df.to_pickle(f"{output_folder}/{args.output}.pkl")
 
@@ -346,7 +348,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--augmentations",
         type=str,
-        default="rotation,shift,flip,zoom,blur,brightness,contrast,gain",
+        default="rotation,shift,flip,zoom,blur,brightness,contrast,gain,speckle",
         help="Comman separated list of augmentations to apply.",
     )
 

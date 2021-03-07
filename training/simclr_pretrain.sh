@@ -122,6 +122,17 @@ brightness,gain
 contrast,gain
 EOF
 
+read -r -d '' SPECKLE <<'EOF'
+speckle,shift
+speckle,flip
+speckle,zoom
+speckle,blur
+speckle,brightness
+speckle,contrast
+speckle,gain
+speckle,rotation
+EOF
+
 FORCE=false
-AUGMENTATIONS=$IAN
+AUGMENTATIONS=$SPECKLE
 simclr_pretrain
