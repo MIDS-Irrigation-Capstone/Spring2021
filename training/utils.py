@@ -394,11 +394,13 @@ class Augment:
         return tf.image.adjust_gamma(x, gamma=1.0, gain=g)
 
     def _speckle(self, x):
-        prob_range=[0.0, 0.005]
+        prob_range=[0.0, 0.02]
+        spec_value=5.
+
         prob = tf.random.uniform((), *prob_range)
         sample = tf.random.uniform(tf.shape(x))
-        noisy_image = tf.where(sample <= prob, tf.zeros_like(x), x)
-        noisy_image = tf.where(sample >= (1. - prob), 255.*tf.ones_like(x), noisy_image)
+        noisy_image = tf.where(sample <= prob, -spec_value*tf.ones_like(x), x)
+        noisy_image = tf.where(sample >= (1. - prob), spec_value*tf.ones_like(x), noisy_image)
         return noisy_image
 
     def _blur(self, x):
