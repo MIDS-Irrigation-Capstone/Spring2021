@@ -329,8 +329,9 @@ def get_batched_dataset(
     else:
         dataset = dataset.shuffle(buffer_size=2048).repeat()
 
-    if ca:
-        dataset = dataset.map(read_ca_tfrecord, num_parallel_calls=10)
+    if ca == 1 or ca == 2:
+        dataset = dataset.map(read_cp_tfrecord (ca), num_parallel_calls=10)
+        #dataset = dataset.map(read_ca_tfrecord, num_parallel_calls=10)
     else:
         dataset = dataset.map(read_tfrecord, num_parallel_calls=10)
 
@@ -419,3 +420,107 @@ class Augment:
             lambda: func(x),
             lambda: x,
         )
+
+
+def read_cp_tfrecord(example, ca):
+    """
+    ALL MEAN AND STD SHOULD BE CALCULATED ONLY WITH THE TRAINING DATA
+    """
+    BAND_STATS = {
+        "mean": {
+            "B01": 340.76769064,
+            "B02": 429.9430203,
+            "B03": 614.21682446,
+            "B04": 590.23569706,
+            "B05": 950.68368468,
+            "B06": 1792.46290469,
+            "B07": 2075.46795189,
+            "B08": 2218.94553375,
+            "B8A": 2266.46036911,
+            "B09": 2246.0605464,
+            "B11": 1594.42694882,
+            "B12": 1009.32729131,
+        },
+        "std": {
+            "B01": 554.81258967,
+            "B02": 572.41639287,
+            "B03": 582.87945694,
+            "B04": 675.88746967,
+            "B05": 729.89827633,
+            "B06": 1096.01480586,
+            "B07": 1273.45393088,
+            "B08": 1365.45589904,
+            "B8A": 1356.13789355,
+            "B09": 1302.3292881,
+            "B11": 1079.19066363,
+            "B12": 818.86747235,
+        },
+    }
+
+    # Use this one-liner to standardize each feature prior to reshaping.
+    def standardize_feature(data, band_name):
+        return (
+            tf.dtypes.cast(data, tf.float32) - BAND_STATS["mean"][band_name]
+        ) / BAND_STATS["std"][band_name]
+
+    # decode the TFRecord
+    # The parse single example methods takes an example (from a tfrecords file),
+    # and a dictionary that explains the data format of each feature.
+    example = tf.io.parse_single_example(
+        example,
+        {
+            "B02": tf.io.FixedLenFeature([120 * 120], tf.int64),
+            "B03": tf.io.FixedLenFeature([120 * 120], tf.int64),
+            "B04": tf.io.FixedLenFeature([120 * 120], tf.int64),
+            "B05": tf.io.FixedLenFeature([120 * 120], tf.int64),
+            "B06": tf.io.FixedLenFeature([120 * 120], tf.int64),
+            "B07": tf.io.FixedLenFeature([120 * 120], tf.int64),
+            "B08": tf.io.FixedLenFeature([120 * 120], tf.int64),
+            "B8A": tf.io.FixedLenFeature([120 * 120], tf.int64),
+            "B11": tf.io.FixedLenFeature([120 * 120], tf.int64),
+            "B12": tf.io.FixedLenFeature([120 * 120], tf.int64),
+        },
+    )
+
+    # After parsing our data into a tensor, let's standardize and reshape.
+    reshaped_example = {
+        "B02": tf.reshape(standardize_feature(example["B02"], "B02"), [120, 120]),
+        "B03": tf.reshape(standardize_feature(example["B03"], "B03"), [120, 120]),
+        "B04": tf.reshape(standardize_feature(example["B04"], "B04"), [120, 120]),
+        "B05": tf.reshape(standardize_feature(example["B05"], "B05"), [120, 120]),
+        "B06": tf.reshape(standardize_feature(example["B06"], "B06"), [120, 120]),
+        "B07": tf.reshape(standardize_feature(example["B07"], "B07"), [120, 120]),
+        "B08": tf.reshape(standardize_feature(example["B08"], "B08"), [120, 120]),
+        "B8A": tf.reshape(standardize_feature(example["B8A"], "B8A"), [120, 120]),
+        "B11": tf.reshape(standardize_feature(example["B11"], "B11"), [120, 120]),
+        "B12": tf.reshape(standardize_feature(example["B12"], "B12"), [120, 120]),
+    }
+
+    # Next sort the layers by resolution - all the same resolution for CA
+    bands_10m = tf.stack(
+        [
+            reshaped_example["B04"],
+            reshaped_example["B03"],
+            reshaped_example["B02"],
+            reshaped_example["B08"],
+        ],
+        axis=2,
+    )
+
+    bands_20m = tf.stack(
+        [
+            reshaped_example["B05"],
+            reshaped_example["B06"],
+            reshaped_example["B07"],
+            reshaped_example["B8A"],
+            reshaped_example["B11"],
+            reshaped_example["B12"],
+        ],
+        axis=2,
+    )
+
+    # Finally resize the 20m data and stack the bands together.
+    img = tf.concat([bands_10m, bands_20m], axis=2)
+    binary_label = reshaped_example["binary_labels"] if ca == 2 else 0
+
+    return img, binary_label
