@@ -133,6 +133,15 @@ speckle,gain
 speckle,rotation
 EOF
 
+read -r -d '' FINALFOUR <<'EOF'
+no,augmentation
+rotation,shift,flip,zoom,blur,brightness,contrast,gain,speckle
+rotation,shift,flip,zoom
+blur,brightness,contrast,gain,speckle
+EOF
+
+
+
 FORCE=false
-AUGMENTATIONS=$SPECKLE
+AUGMENTATIONS=$FINALFOUR
 simclr_pretrain
