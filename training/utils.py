@@ -13,7 +13,7 @@ JUSTRGB = False
 EXPANDED_LABELS = True
 
 
-@tf.function
+# @tf.function
 def dataset_length(data_dir):
     if os.path.isdir(data_dir):
         input_files = tf.io.gfile.glob(os.path.join(data_dir, "*"))

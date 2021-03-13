@@ -66,7 +66,11 @@ chmod 777 /data
 
 ### Mount S3
 mkdir -pm 777 /mnt/irrigation_data
-s3fs mids-capstone-irrigation-detection /mnt/irrigation_data -o iam_role=auto -o allow_other
+s3fs mids-capstone-irrigation-detection /mnt/irrigation_data \
+  -o iam_role=auto \
+  -o allow_other \
+  -o default_acl=bucket-owner-full-control \
+  -o umask=000,uid=1000
 
 ### Get Github API token
 github_token=$(aws secretsmanager get-secret-value \
