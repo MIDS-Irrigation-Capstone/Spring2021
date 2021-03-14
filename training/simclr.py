@@ -21,7 +21,7 @@ from tensorflow.keras.layers import *
 from tensorflow.keras.applications.resnet50 import preprocess_input, decode_predictions
 
 from utils import *
-import helpers
+from helpers import *
 import losses
 import argparse
 import cv2
@@ -71,7 +71,7 @@ def build_simclr_model(imported_model, hidden_1, hidden_2, hidden_3):
 def train_step(xis, xjs, model, optimizer, criterion, temperature, batch_size):
 
     # Mask to remove positive examples from the batch of negative samples
-    negative_mask = helpers.get_negative_mask(batch_size)
+    negative_mask = Get_Negative_Mask(batch_size)
 
     with tf.GradientTape() as tape:
         # Get our latent space vectors for our two sets of augmented images.
@@ -131,7 +131,6 @@ def run_model(
     output_folder,
     training_data,
     expanded_labels,
-    augmentations,
 ):
 
     """
@@ -186,34 +185,10 @@ def run_model(
     # time_callback = TimeHistory()
 
     # Augment Class used for color distortion and Gaussian Blur
-    augment = Augment(augmentations)
-
-    # Set Other Augmentation data
-    ROTATION = 180 if "rotation" in augmentations else 0
-    SHIFT = 0.10 if "shift" in augmentations else 0
-    FLIP = True if "flip" in augmentations else False
-    ZOOM = 0.20 if "zoom" in augmentations else 0
-
-    print(50 * "=")
-    print("Augmentations:")
-    print(f"\tRotation:   {ROTATION}")
-    print(f"\tShift:      {SHIFT}")
-    print(f"\tFlip:       {FLIP}")
-    print(f"\tZoom:       {ZOOM}")
-    print(f'\tBlur:       {"blur" in augmentations}')
-    print(f'\tBrightness: {"brightness" in augmentations}')
-    print(f'\tcontrast:   {"contrast" in augmentations}')
-    print(f'\tGain:       {"gain" in augmentations}')
-    print(f'\tSpeckle:    {"speckle" in augmentations}\n')
+    augment = Augment()
 
     # Use Keras to augment images in batches
     datagen = image.ImageDataGenerator(
-        rotation_range=ROTATION,
-        width_shift_range=SHIFT,
-        height_shift_range=SHIFT,
-        horizontal_flip=FLIP,
-        vertical_flip=FLIP,
-        zoom_range=ZOOM,
         preprocessing_function=augment.augfunc,
     )
 
@@ -262,15 +237,6 @@ def run_model(
     df["h1"] = 1024
     df["h2"] = 512
     df["output_dim"] = 128
-    df["rotation"] = ROTATION
-    df["shift"] = SHIFT
-    df["flip"] = FLIP
-    df["zoom"] = ZOOM
-    df["blur"] = "blur" in augmentations
-    df["brightness"] = "brightness" in augmentations
-    df["contrast"] = "contrast" in augmentations
-    df["gain"] = "gain" in augmentations
-    df["speckle"] = "speckle" in augmentations
 
     df.to_pickle(f"{output_folder}/{args.output}.pkl")
 
@@ -346,13 +312,6 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
-        "--augmentations",
-        type=str,
-        default="rotation,shift,flip,zoom,blur,brightness,contrast,gain,speckle",
-        help="Comman separated list of augmentations to apply.",
-    )
-
-    parser.add_argument(
         "--save-iterations",
         default=0,
         type=int,
@@ -370,7 +329,6 @@ if __name__ == "__main__":
     }
     ca_flag_dict = {"True": True, "False": False}
 
-    augmentations = set(args.augmentations.split(","))
 
     if args:
         np.random.seed(seed=args.seed)
@@ -386,5 +344,4 @@ if __name__ == "__main__":
             output_folder=args.output_dir,
             training_data=args.train_data,
             expanded_labels=args.expanded_labels,
-            augmentations=augmentations,
         )

@@ -3,10 +3,8 @@ import os
 import errno
 from glob import glob
 
-import cv2
 import numpy as np
 import time
-from tensorflow.keras.preprocessing import image
 
 
 JUSTRGB = False
@@ -351,75 +349,6 @@ class TimeHistory(tf.keras.callbacks.Callback):
     def on_epoch_end(self, batch, logs={}):
         self.times.append(time.time() - self.epoch_time_start)
 
-
-class Augment:
-    # Default augmentations are on, can be turned on individually if parameters provided
-    def __init__(self, augmentations):
-        self.blur = "blur" in augmentations
-        self.brightness = "brightness" in augmentations
-        self.contrast = "contrast" in augmentations
-        self.gain = "gain" in augmentations
-        self.speckle = "speckle" in augmentations
-
-        self.scale = 0.5
-
-    def augfunc(self, sample):
-        # Randomly apply transformation (color distortions) with probability p.
-        if self.brightness:
-            sample = self._random_apply(self._brightness, sample)
-
-        if self.contrast:
-            sample = self._random_apply(self._contrast, sample)
-
-        if self.gain:
-            sample = self._random_apply(self._gain, sample)
-
-        if self.blur:
-            sample = self._random_apply(self._blur, sample)
-
-        if self.speckle:
-            sample = self._random_apply(self._speckle, sample)
-
-        return sample
-
-    def _brightness(self, x):
-        return tf.image.random_brightness(x, max_delta=0.8 * self.scale)
-
-    def _contrast(self, x):
-        return tf.image.random_contrast(
-            x, lower=1 - 0.8 * self.scale, upper=1 + 0.8 * self.scale
-        )
-
-    def _gain(self, x):
-        g = np.random.uniform(-self.scale, self.scale)
-        return tf.image.adjust_gamma(x, gamma=1.0, gain=g)
-
-    def _speckle(self, x):
-        prob_range=[0.0, 0.02]
-        spec_value=5.
-
-        prob = tf.random.uniform((), *prob_range)
-        sample = tf.random.uniform(tf.shape(x))
-        noisy_image = tf.where(sample <= prob, -spec_value*tf.ones_like(x), x)
-        noisy_image = tf.where(sample >= (1. - prob), spec_value*tf.ones_like(x), noisy_image)
-        return noisy_image
-
-    def _blur(self, x):
-        # SimClr implementation is applied at 10% of image size with a random sigma
-        p = np.random.uniform(0.1, 2)
-        if type(x) == np.ndarray:
-            return cv2.GaussianBlur(x, (5, 5), p)
-        return cv2.GaussianBlur(x.numpy(), (5, 5), p)
-
-    def _random_apply(self, func, x, probability=0.8):
-        return tf.cond(
-            tf.less(
-                tf.random.uniform([], minval=0, maxval=1, dtype=tf.float32),
-                tf.cast(probability, tf.float32),
-            ),
-            lambda: func(x),
-            lambda: x,
-        )
 
 
 def read_cp_tfrecord(example, ca):
