@@ -13,17 +13,13 @@ resource "aws_iam_role_policy" "mids" {
   "Statement": [
     {
       "Effect": "Allow",
-      "Action": ["s3:ListBucket"],
-      "Resource": ["arn:aws:s3:::${var.bucket_name}"]
-    },
-    {
-      "Effect": "Allow",
       "Action": [
-        "s3:PutObject",
-        "s3:GetObject",
-        "s3:DeleteObject"
+        "s3:*"
       ],
-      "Resource": ["arn:aws:s3:::${var.bucket_name}/*"]
+      "Resource": [
+        "arn:aws:s3:::${var.bucket_name}",
+        "arn:aws:s3:::${var.bucket_name}/*"
+      ]
     },
     {
       "Effect": "Allow",
