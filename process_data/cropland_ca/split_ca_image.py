@@ -121,7 +121,7 @@ def split_convert2TFrecord(TFRecord_writer,
 
 def get_month(patch):
     if patch:
-        return int(patch.split('_')[1])
+        return int(patch.split('_')[2])
     return None
 
 def create_split(root_folder,
@@ -130,7 +130,7 @@ def create_split(root_folder,
     #Create TFWriter for entire dataset
     try:
         print('Creating TFRecord writer')
-        tfwriter = tf.io.TFRecordWriter(os.path.join(out_folder, "CA.tfrecord"))
+        tfwriter = tf.io.TFRecordWriter(os.path.join(out_folder, "CV_sample.tfrecord"))
 
         print(f'Processing file in folder {root_folder}')
         #open the patch_names file in the folder and read it line by line to split the images
@@ -151,8 +151,8 @@ def create_split(root_folder,
 
     tfwriter.close()
 
-ROOT_FOLDER = '/home/cagastya/hdd/gee_california'
-OUT_FOLDER = '/home/cagastya/MIDS_Capstone/data/Tfrecords.CA'
+ROOT_FOLDER = '/home/cagastya/hdd/gee_central_valley'
+OUT_FOLDER = '/home/cagastya/MIDS_Capstone/data/Tfrecords.CentralValley'
 
 if __name__ == "__main__":
     create_split(ROOT_FOLDER, OUT_FOLDER)
