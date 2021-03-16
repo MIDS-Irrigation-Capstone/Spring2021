@@ -6,7 +6,8 @@ IFS=$'\n\t'
 GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
-CA_ROOT="/mnt/irrigation_data/gee_california/"
+#CA_ROOT="/mnt/irrigation_data/gee_california/"
+CA_ROOT="/mnt/irrigation_data/gee_central_valley/"
 PROCESSING_DIR="/home/ubuntu/repos/Spring2021/process_data/cropland_ca/"
 S3_BUCKET="s3://mids-capstone-irrigation-detection/CA_tfrecords"
 

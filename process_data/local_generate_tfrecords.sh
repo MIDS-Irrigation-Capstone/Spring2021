@@ -7,7 +7,7 @@ GREEN='\033[0;32m'
 NC='\033[0m' # No Color
 
 EARTHNET_ROOT="/hdd/BigEarthNet-v1.0"
-OUT_PATH="./Tfrecords"
+OUT_PATH="/home/cagastya/MIDS_Capstone/data/Tfrecords.SimCLR/"
 #S3_BUCKET="s3://mids-capstone-irrigation-detection/BigEarthNet_tfrecords"
 
 function log() {
@@ -37,7 +37,7 @@ function generate_tfrecords_locally() {
     python3 prep_splits.py \
     -r ${EARTHNET_ROOT} \
     -o ${OUT_PATH} \
-    -n "splits/train.csv" "splits/test.csv" "splits/val.csv" \
+    -n "pretraining_splits/train"\
     -l tensorflow
 }
 
