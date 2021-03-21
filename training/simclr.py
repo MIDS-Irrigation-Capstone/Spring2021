@@ -67,7 +67,6 @@ def build_simclr_model(imported_model, hidden_1, hidden_2, hidden_3):
     return simclr_model
 
 
-@tf.function
 def train_step(xis, xjs, model, optimizer, criterion, temperature, batch_size):
 
     # Mask to remove positive examples from the batch of negative samples
