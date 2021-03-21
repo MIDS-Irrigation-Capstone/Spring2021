@@ -66,13 +66,21 @@ class Augment:
 
     # Image Transformation functions
     def _rotation(self, x, degrees=180):
-        return image.random_rotation(x, degrees)
+        #return image.random_rotation(x, degrees)
+        return tf.image.rot90(x, k=np.random.randint(4))
 
     def _shift(self, x, shift=0.1):
-        return image.random_shift(x, wrg=shift, hrg=shift)
+        #return image.random_shift(x, wrg=shift, hrg=shift)
+        rx = np.random.randint(120*shift)
+        ry = np.random.randint(120*shift)
+        return tf.roll(x, shift=[ry, rx, 0], axis=[0, 1, 2])
 
     def _zoom(self, x, zrng=0.2):
-        return image.random_zoom(x, zoom_range=(1-zrng, 1+zrng))
+        #return image.random_zoom(x, zoom_range=(1-zrng, 1+zrng))
+        boxes = tf.random.uniform(shape=(1, 4))
+        box_indices = tf.random.uniform(shape=(1,), minval=0, maxval=1, dtype=tf.int32)
+
+        return tf.image.crop_and_resize( tf.expand_dims(x, axis=0), boxes, box_indices, (120,120), method="bilinear")
 
     def _flip(self, x):
         x = tf.image.random_flip_left_right(x)
