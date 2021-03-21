@@ -2,10 +2,11 @@
 
 DATA_DIR=/data
 ARCH=ResNet152
-OUTPUT_PREFIX="BigEarthNet_SimCLR_pretrain_${ARCH}_E50_B32"
-OUTPUT_DIR=/data/models
+OUTPUT_PREFIX="BigEarthNet_SimCLR_pretrain_${ARCH}_E50_B32_V2"
+OUTPUT_DIR=/mnt/irrigation_data/models/simclr2_pretrain
 EPOCHS=50
 BATCH_SIZE=32
+SAVE_ITER=1
 
 TRAIN_DATA="/data/Tfrecord.SimCLR/train.tfrecord"
 
@@ -49,7 +50,8 @@ function simclr_pretrain() {
     --output-dir "$OUTPUT_DIR" \
     -e "$EPOCHS" \
     -b "$BATCH_SIZE" \
-    --train-data "$TRAIN_DATA"
+    --train-data "$TRAIN_DATA" \
+    --save-iterations "$SAVE_ITER"
   docker logs "$DOCKER_NAME" >"${OUTPUT_DIR}/${outfile}.log"
   remove_container
 }
