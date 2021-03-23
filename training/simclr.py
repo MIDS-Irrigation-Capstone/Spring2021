@@ -148,8 +148,6 @@ def run_model(
     print(f"Running model: SimCLR {args.output}")
     print(50 * "=")
     print(f"Batch Size: {BATCH_SIZE}")
-    print(50 * "=")
-    print(f"Using Model Architecture: {architecture}")
 
     # Get the training files in batches. California data has different files
     training_dataset = get_dataset(
@@ -172,7 +170,13 @@ def run_model(
     optimizer = tf.keras.optimizers.SGD(lr_decayed_fn)
 
     # Build the model with the following hidden layer sizes
-    simclr_2 = build_simclr_model(architecture, 1024, 512, 128)
+    print(50 * "*")
+    if args.load_checkpoint is not None :
+        print(f"Loading checkpoint: {args.load_checkpoint}")
+        simclr_2 = tf.keras.models.load_model(args.load_checkpoint)
+    else :
+        print(f"Building Model Architecture: {architecture}, Projections: 1024, 512, 128")
+        simclr_2 = build_simclr_model(architecture, 1024, 512, 128)
 
     # Print Summary of model for user
     simclr_2.summary()
@@ -316,6 +320,13 @@ if __name__ == "__main__":
         type=int,
         help="Save model after number of epoch iterations.",
     )
+    parser.add_argument(
+        "--load-checkpoint",
+        default=None,
+        type=str,
+        help="Load model checkpoint and use as starting point for continued training.",
+    )
+
 
     args = parser.parse_args()
 
