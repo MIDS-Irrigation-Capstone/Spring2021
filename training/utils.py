@@ -10,56 +10,11 @@ import time
 JUSTRGB = False
 EXPANDED_LABELS = True
 
+# Indicate what is the pretraining dataset so that correct Standardization can be applied
+PRETRAIN_DATA = 'BEN' #Other option is CA
 
-# @tf.function
-def dataset_length(data_dir):
-    if os.path.isdir(data_dir):
-        input_files = tf.io.gfile.glob(os.path.join(data_dir, "*"))
-        data_set = tf.data.TFRecordDataset(input_files)
-    elif os.path.isfile(data_dir):
-        data_set = tf.data.TFRecordDataset(data_dir)
-    else:
-        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), data_dir)
-
-    return sum(1 for record in iter(data_set))
-
-
-def get_dataset(
-    filename, batch_size, justRGB=False, expanded=False, ca_flag=False, simclr=False
-):
-    if os.path.isdir(filename):
-        filename = [f for f in glob(os.path.join(filename, "*.tfrecord"))]
-    elif not os.path.isfile(filename):
-        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), filename)
-
-    return get_batched_dataset(
-        filename,
-        batch_size,
-        justRGB,
-        expanded_labels=expanded,
-        ca=ca_flag,
-        simclr=simclr,
-    )
-
-
-def _get_binary_label(example):
-    if not EXPANDED_LABELS:
-        return example["original_labels_multi_hot"][tf.constant(12)]
-    return (
-        example["original_labels_multi_hot"][tf.constant(12)]
-        | example["original_labels_multi_hot"][tf.constant(13)]
-        | example["original_labels_multi_hot"][tf.constant(14)]
-        | example["original_labels_multi_hot"][tf.constant(15)]
-        | example["original_labels_multi_hot"][tf.constant(16)]
-    )
-
-
-def read_tfrecord(example):
-    """
-    THIS FUNCTION IS USED TO PARSE THE TFRECORDS FILES FOR BIGEARTHNET DATA.
-    THE BAND STATISTICS WERE PROVIDED BY THE BIGEARTHNET TEAM
-    """
-    BAND_STATS = {
+STATS = {
+    "BEN" : {
         "mean": {
             "B01": 340.76769064,
             "B02": 429.9430203,
@@ -88,7 +43,87 @@ def read_tfrecord(example):
             "B11": 1079.19066363,
             "B12": 818.86747235,
         },
+    },
+    "CA" : {
+        "mean": {
+            "B2": 704.0660306667106,
+            "B3": 1013.6625595886348,
+            "B4": 1177.3966978795684,
+            "B5": 1559.4157583764888,
+            "B6": 2271.823718038332,
+            "B7": 2570.590654856275,
+            "B8": 2729.77884789601,
+            "B8A": 2782.5820922432317,
+            "B11": 2633.2600006272755,
+            "B12": 1960.1242074549111
+        },
+        "std": {
+            "B2": 275.44633762623107,
+            "B3": 341.9727574411451,
+            "B4": 469.3295063736902,
+            "B5": 439.3445385554108,
+            "B6": 405.9869176625257,
+            "B7": 462.80766566429446,
+            "B8": 453.4091836811935,
+            "B8A": 465.3067073795589,
+            "B11": 570.6215399891606,
+            "B12": 593.4589000748651
+        }
     }
+}
+
+# @tf.function
+def dataset_length(data_dir):
+    if os.path.isdir(data_dir):
+        input_files = tf.io.gfile.glob(os.path.join(data_dir, "*"))
+        data_set = tf.data.TFRecordDataset(input_files)
+    elif os.path.isfile(data_dir):
+        data_set = tf.data.TFRecordDataset(data_dir)
+    else:
+        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), data_dir)
+
+    return sum(1 for record in iter(data_set))
+
+
+def get_dataset(
+    filename, batch_size, justRGB=False, expanded=False, ca_flag=False, simclr=False
+):
+    if os.path.isdir(filename):
+        filename = [f for f in glob(os.path.join(filename, "*.tfrecord"))]
+    elif not os.path.isfile(filename):
+        raise FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), filename)
+
+    return get_batched_dataset(
+        filename,
+        batch_size,
+        justRGB,
+        expanded_labels=expanded,
+        ca=ca_flag,
+        simclr=simclr
+    )
+
+
+def _get_binary_label(example):
+    if not EXPANDED_LABELS:
+        return example["original_labels_multi_hot"][tf.constant(12)]
+    return (
+        example["original_labels_multi_hot"][tf.constant(12)]
+        | example["original_labels_multi_hot"][tf.constant(13)]
+        | example["original_labels_multi_hot"][tf.constant(14)]
+        | example["original_labels_multi_hot"][tf.constant(15)]
+        | example["original_labels_multi_hot"][tf.constant(16)]
+    )
+
+
+def read_tfrecord(example):
+    """
+    THIS FUNCTION IS USED TO PARSE THE TFRECORDS FILES FOR BIGEARTHNET DATA.
+    There are are two band statistics for each type of training data.
+    Standardization should always be done with the training data stats.
+    Use the correct stats for standarizing the data based on what type of
+    pretraining data is used
+    """
+    BAND_STATS = STATS['BEN'] if PRETRAIN_DATA == 'BEN' else STATS['CA']
 
     # Use this one-liner to standardize each feature prior to reshaping.
     def standardize_feature(data, band_name):
@@ -194,35 +229,13 @@ def read_tfrecord(example):
 
 def read_ca_tfrecord(example):
     """
-    THE CALIFORNIA DATA HAS DIFFERENT POPULATION STATISTICS AS EXPECETED.
-    CALCULATED VIA THE process_california_data.ipynb file
+    THE CALIFORNIA CENTRAL VALLEY DATA HAS DIFFERENT
+    POPULATION STATISTICS AS EXPECETED.
+    Standardization should always be done with the training data stats.
+    Use the correct stats for standarizing the data based on what type of
+    pretraining data is used
     """
-    BAND_STATS = {
-        "mean": {
-            "B02": 745.8342280288207,
-            "B03": 1066.1362867829712,
-            "B04": 1294.678473044234,
-            "B05": 1645.7598649250806,
-            "B06": 2246.824426424665,
-            "B07": 2516.3336991935817,
-            "B08": 2688.8463771950937,
-            "B8A": 2733.816949232295,
-            "B11": 2769.942382613557,
-            "B12": 2092.625560070325,
-        },
-        "std": {
-            "B02": 504.9172431483328,
-            "B03": 616.4692423335321,
-            "B04": 851.3811496920607,
-            "B05": 795.0872173538605,
-            "B06": 765.746057996193,
-            "B07": 871.266391942569,
-            "B08": 919.4293720949656,
-            "B8A": 891.7677760562052,
-            "B11": 1083.5092422778923,
-            "B12": 1101.34386721669,
-        },
-    }
+    BAND_STATS = STATS['BEN'] if PRETRAIN_DATA == 'BEN' else STATS['CA']
 
     # Use this one-liner to standardize each feature prior to reshaping.
     def standardize_feature(data, band_name):
@@ -299,7 +312,7 @@ def get_batched_dataset(
     augment=False,
     simclr=False,
     ca=False,
-    expanded_labels=True,
+    expanded_labels=True
 ):
     """
     This function is used to return a batch generator for training our tensorflow model.
@@ -327,9 +340,9 @@ def get_batched_dataset(
     else:
         dataset = dataset.shuffle(buffer_size=2048).repeat()
 
-    if ca == 1 or ca == 2:
-        dataset = dataset.map(read_cp_tfrecord (ca), num_parallel_calls=10)
-        #dataset = dataset.map(read_ca_tfrecord, num_parallel_calls=10)
+    if ca:
+        #dataset = dataset.map(read_cp_tfrecord (ca), num_parallel_calls=10)
+        dataset = dataset.map(read_ca_tfrecord, num_parallel_calls=10)
     else:
         dataset = dataset.map(read_tfrecord, num_parallel_calls=10)
 
