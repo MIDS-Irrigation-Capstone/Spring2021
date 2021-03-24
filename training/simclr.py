@@ -171,9 +171,11 @@ def run_model(
 
     # Build the model with the following hidden layer sizes
     print(50 * "*")
+    starting_epoch = 0
     if args.load_checkpoint is not None :
         print(f"Loading checkpoint: {args.load_checkpoint}")
         simclr_2 = tf.keras.models.load_model(args.load_checkpoint)
+        starting_epoch = args.checkpoint_epoch
     else :
         print(f"Building Model Architecture: {architecture}, Projections: 1024, 512, 128")
         simclr_2 = build_simclr_model(architecture, 1024, 512, 128)
@@ -199,7 +201,7 @@ def run_model(
     # min_loss_epoch = 0
 
     # Manually walk through epochs and batches
-    for epoch in tqdm(range(epochs)):
+    for epoch in tqdm(range(starting_epoch, epochs)):
         step_wise_loss = []
 
         # Loop over batches, perform augmentation and calculate poss
@@ -325,6 +327,12 @@ if __name__ == "__main__":
         default=None,
         type=str,
         help="Load model checkpoint and use as starting point for continued training.",
+    )
+    parser.add_argument(
+        "--checkpoint_epoch",
+        default=0,
+        type=int,
+        help="Epoch of saved checkpoint model.",
     )
 
 
