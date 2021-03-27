@@ -7,8 +7,9 @@ BATCH_SIZE=32
 
 MODEL="/mnt/irrigation_data/models/simclr2_pretrain/CASprings_SimCLR_pretrain_ResNet152_E50_B32_V2.h5"
 
-DATA_DIR=/data/balanced
-#DATA_DIR=/data/expanded
+SET=balanced
+#SET=expanded
+DATA_DIR="/data/${SET}"
 
 TRAIN_PERCENTS="1 3 10 25 50"
 
@@ -44,7 +45,7 @@ function simclr_finetune() {
     TRAIN_DATA="${DATA_DIR}/${TRAIN_PERCENT_DIR}/train"
     VAL_DATA="${DATA_DIR}/${TRAIN_PERCENT_DIR}/val"
 
-    local outfile="${TRAIN_PERCENT}_$(basename $MODEL .h5)"
+    local outfile="${SET}_${PERCENT}_$(basename $MODEL .h5)"
     if [[ -f "${OUTPUT_DIR}/${outfile}.h5" ]]; then
       if [[ "${FORCE:-}" != "true" ]]; then
         warn "${outfile} already trained, skipping..."
