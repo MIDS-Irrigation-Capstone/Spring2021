@@ -92,21 +92,25 @@ def run_model(teacher_model_path, architecture, training_dataset, args) :
             stats = student.train_on_batch(batch[0], distill_labels, return_dict=True,)
 
             # TODO store stats for saving to file later?
-            print(step, distill_labels,"Stats:", stats)
+            #print(step, distill_labels,"Stats:", stats)
 
         # TODO add validation stat?
 
-    # Eval model on Test dataset
-    test_data = get_dataset(args.test_set, batch_size=args.BATCH_SIZE, expanded=args.expanded_labels)
-    test_steps = dataset_length(args.test_set) // args.BATCH_SIZE
+    # Eval student/teacher models on Test dataset
+    student_stats = student.evaluate(training_data, steps=steps_per_epoch, return_dict=True)
+    df = pd.DataFrame.from_dict(student_stats, orient="index", columns=["student"])
+    print("student_test_stats",student_stats)
 
-    test_stats = student.evaluate(test_data, steps=test_steps, return_dict=True)
-    df = pd.DataFrame.from_dict(test_stats, orient="index")
-    print("test_stats",test_stats)
+    teacher_stats = teacher_model.evaluate(training_data, steps=steps_per_epoch, return_dict=True)
+    df2 = pd.DataFrame.from_dict(teacher_stats, orient="index", columns=["teacher"])
+    print("teacher_test_stats",teacher_stats)
 
+    df_all = pd.concat([df, df2], axis=1)
     # Save student out to disk
     student.save(f'{args.output_dir}/{args.output}.h5')
-    df.to_pickle(f'{args.output_dir}/{args.output}.pkl')
+    df_all.to_pickle(f'{args.output_dir}/{args.output}.pkl')
+
+    print(df_all)
 
 
 if __name__ == '__main__':
@@ -141,7 +145,7 @@ if __name__ == '__main__':
         "--BATCH_SIZE",
         default=32,
         type=int,
-        help="batch size to use during training and validation",
+        help="batch size to use during training",
     )
     parser.add_argument(
         "-e", "--EPOCHS", default=50, type=int, help="number of epochs to run"
@@ -152,17 +156,6 @@ if __name__ == '__main__':
                         action="store_true",
                         help="Whether to use expanded irrigation labels",)
 
-    parser.add_argument(
-        "--validation-set",
-        type=str,
-        help="Path to tfrecords for validation set",
-    )
-
-    parser.add_argument(
-        "--test-set",
-        type=str, required=True,
-        help="Path to tfrecords for test set",
-    )
 
     args = parser.parse_args()
 
