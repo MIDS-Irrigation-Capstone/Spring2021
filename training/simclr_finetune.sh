@@ -1,22 +1,19 @@
 #!/bin/bash
 
-DATA_DIR=/data
-# OUTPUT_DIR=/data/irrigation_data/models/simclr_finetune
-OUTPUT_DIR=/mnt/irrigation_data/models/simclr_finetune
+
+OUTPUT_DIR=/mnt/irrigation_data/models/CA_finetune
 EPOCHS=50
 BATCH_SIZE=32
 
-S3_DIR="/mnt/irrigation_data/BigEarthNet_tfrecords_balanced"
+MODEL="/mnt/irrigation_data/models/simclr2_pretrain/CASprings_SimCLR_pretrain_ResNet152_E50_B32_V2.h5"
+
 DATA_DIR=/data/balanced
+#DATA_DIR=/data/expanded
 
-TRAIN_PERCENT=3
-TRAIN_PERCENT_DIR="tfrecords_${TRAIN_PERCENT}_percent"
-TRAIN_TARBALL="${S3_DIR}/${TRAIN_PERCENT_DIR}.tar"
-TRAIN_DATA="${DATA_DIR}/${TRAIN_PERCENT_DIR}/train"
-VAL_DATA="${DATA_DIR}/${TRAIN_PERCENT_DIR}/val"
+TRAIN_PERCENTS="1 3 10 25 50"
 
-TEST_TARBALL="${S3_DIR}/${TRAIN_PERCENT_DIR}.tar"
 TEST_DATA="${DATA_DIR}/tfrecords_test/test"
+
 
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
@@ -32,33 +29,6 @@ function warn() {
   printf "$(date -u) ${YELLOW}WARNING${NC} $msg\n"
 }
 
-function extract_training_data() {
-  ### extract tfrecords
-  mkdir -pm 777 "$DATA_DIR"
-  log "extracting $TRAIN_TARBALL"
-  sudo ls -la "$TRAIN_TARBALL"
-  sudo tar xf "$TRAIN_TARBALL" \
-    -C "$DATA_DIR" \
-    --exclude="${TRAIN_PERCENT_DIR}/train.tfrecord" \
-    --exclude="${TRAIN_PERCENT_DIR}/val.tfrecord" \
-    --exclude="${TRAIN_PERCENT_DIR}/test*" \
-    --owner=ubuntu \
-    --group=ubuntu \
-    --no-same-permissions
-}
-
-function extract_test_data() {
-  ### extract tfrecords
-  mkdir -pm 777 "$DATA_DIR"
-  log "extracting $TEST_TARBALL"
-  sudo ls -la "$TEST_TARBALL"
-  sudo tar xf "$TEST_TARBALL" \
-    -C "$DATA_DIR" \
-    --exclude="tfrecords_test/test.tfrecord" \
-    --owner=ubuntu \
-    --group=ubuntu \
-    --no-same-permissions
-}
 
 function remove_container() {
   log "Removing docker container: $DOCKER_NAME"
@@ -68,7 +38,12 @@ function remove_container() {
 function simclr_finetune() {
   mkdir -pm 777 ${OUTPUT_DIR}
   trap remove_container EXIT
-  for MODEL in $(ls -1 /mnt/irrigation_data/models/simclr_pretrain/*.h5); do
+  for PERCENT in $TRAIN_PERCENTS; do
+    TRAIN_PERCENT_DIR="tfrecords_${PERCENT}_percent"
+
+    TRAIN_DATA="${DATA_DIR}/${TRAIN_PERCENT_DIR}/train"
+    VAL_DATA="${DATA_DIR}/${TRAIN_PERCENT_DIR}/val"
+
     local outfile="${TRAIN_PERCENT}_$(basename $MODEL .h5)"
     if [[ -f "${OUTPUT_DIR}/${outfile}.h5" ]]; then
       if [[ "${FORCE:-}" != "true" ]]; then
