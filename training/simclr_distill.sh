@@ -68,7 +68,7 @@ function simclr_distill() {
         -b "$BATCH_SIZE" \
         -o "${outfile}" \
         --output-dir "$OUTPUT_DIR" \
-        --training-data "$TEST_DATA" \
+        --train_data "$TEST_DATA" \
         --arch "$ARCH" 
       docker logs "$DOCKER_NAME" 2>&1 >"${OUTPUT_DIR}/${outfile}.log"
       remove_container
