@@ -79,8 +79,6 @@ function simclr_finetune() {
   done
 }
 
-[ -d "$TRAIN_DATA" ] || extract_training_data
-[ -d "$TEST_DATA" ] || extract_test_data
 
 FORCE=false
 simclr_finetune
